@@ -1,0 +1,19 @@
+# Render blueprint — LearnChart FX (free plan, no card needed).
+# NOTE: Render free tier has an ephemeral filesystem, so the SQLite
+# database file resets on redeploy/restart. Same behaviour as Nexora
+# on Render free tier. For permanent data, use a paid Render disk
+# or a managed Postgres later — the DB layer is one module (src/lib/db.js).
+services:
+  - type: web
+    name: learnchart-fx
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: KEY_ENCRYPTION_SECRET
+        generateValue: true

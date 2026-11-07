@@ -1,0 +1,139 @@
+# LearnChart FX — Phase 1 (User Side Only)
+
+A forex trading education website for **Siam Chowdhury** and **Rex Mizan**.
+Built from the LearnChart FX full system prompt (24 sections) and the
+UI/UX designer mockup (dark theme, floating pill nav, yellow–orange
+gradient accent #FFC531 → #FF9E2C, Poppins / Manrope).
+
+> **Phase 1 = user side only. There is NO admin panel, admin login, admin
+> route or admin-only UI in this build.** The structure is admin-ready only:
+> courses/services live as database records and every placeholder is driven
+> from `src/lib/config.js` / the database seed, so a later admin phase can
+> manage them without restructuring the site.
+
+## Quick start
+
+```bash
+npm install
+npm start          # production server on http://localhost:3000
+```
+
+For development: `npm run dev`.
+
+**No setup beyond that.** The database is SQLite via Node 22's built-in
+`node:sqlite` — zero extra services, the file is created automatically at
+`data/learnchart.db` on first run.
+
+## Stack
+
+- **Next.js 15 (App Router) + React 19 + Node.js** — JavaScript throughout.
+  No Java anywhere (Java and JavaScript are different languages; Java is
+  never needed for this site).
+- **SQLite** via Node's built-in `node:sqlite`. **All database access lives
+  in one module, `src/lib/db.js`** — so the database can be swapped for
+  Postgres later by changing that single file. Nothing else touches the DB.
+- **Auth:** email + password, scrypt-hashed; signed HTTP-only session
+  cookies. Course Keys are generated per enrollment, stored SHA-256 hashed,
+  with an AES-256-GCM encrypted copy.
+- **Images:** `sharp` compresses uploaded profile pictures and post
+  pictures (max 1200px wide JPEG).
+
+## Pages
+
+| Route | What it is |
+|---|---|
+| `/` | Home — exactly the 12 sections of prompt Section 9, in order |
+| `/courses` | Courses & Services — the 3 offers of Section 10 |
+| `/mentors` | Both mentors, fully open, no profit claims |
+| `/faq` | FAQ tabs All (11) / General (2) / Enrollment (9), accordions |
+| `/contact` | Contact form → saved to DB |
+| `/signup`, `/login`, `/forgot-password`, `/reset-password` | Auth |
+| `/profile` | Details, profile picture, My Enrollments, own Course Key |
+| `/enroll/[slug]`, `/enroll/[slug]/success` | Enrollment + confirmation |
+| `/course-videos` | 10 lessons — locked until Forex enrollment + valid Course Key |
+| `/community` | Members-only feed, composer, member chat, Mentor Special Chat |
+| `/live-room` | Live Room — Premium Live Trade Support members only |
+| `/consultation` | Trading Consultation — Consultation members only, Coming Soon |
+
+## Access rules (enforced server-side, in `src/lib/access.js`)
+
+| Area | Who can enter |
+|---|---|
+| Mentors | Everyone |
+| Community | Any enrollment |
+| Live Room | Premium Live Trade Support enrollment ONLY |
+| Consultation | Trading Consultation enrollment ONLY |
+| Course Videos | Forex course enrollment + valid Course Key |
+
+Locked pages show a clear locked preview naming exactly which enrollment
+unlocks them. Gated pages are `noindex` and excluded from the sitemap.
+
+## Course Videos & Course Keys
+
+- Every Forex enrollment generates **one unique Course Key** for that
+  student only (shown in their enrollment confirmation and their own
+  profile — never to others, never one shared key).
+- Lessons stay locked until the student enters their key; verification is
+  **server-side**; a wrong key shows a clear error; unlock is remembered
+  for that logged-in student.
+- Videos are **YouTube Unlisted embeds only** (never Private, never stored
+  on this hosting). Embed URLs are never sent to a user who has not
+  unlocked the lessons. YouTube video IDs are `[Placeholder]` in
+  `src/lib/config.js` until Siam provides them.
+
+## Community post rules (enforced in UI and server)
+
+- **Text:** yes. **Picture upload:** yes (images only, ≤ 5 MB, compressed).
+- **Video upload: NO anywhere.** There is no video-upload field and the
+  server rejects video files.
+- **Google Drive video link:** yes — validated as a real Drive link,
+  converted to a Drive embed player inside the post, streamed from Drive
+  (zero hosting space, lazy-loaded). A non-Drive link is a clear error and
+  the post is not published. Posting warns to set the Drive file to
+  "Anyone with the link can view".
+
+## Placeholders — everything in `src/lib/config.js` (single source)
+
+Stats numbers, testimonials, social handles/links, broker names/logos/links
+(4 cards), mentor photos/bios/tags, curriculum PDF, YouTube video IDs,
+lesson titles/durations (beyond "Starting Your Trading Journey" and
+"Mastering Trading Psychology"), payment method, streaming providers,
+contact email/phone. **Nothing is invented and nothing is copied from
+TradingChart.org** — every one of those is a marked `[Placeholder]`.
+
+## Deployment (Render — GitHub + Render only)
+
+`render.yaml` is in the repo (free plan, Node 22, `npm install` → `npm run build` → `npm start`).
+`SESSION_SECRET` and `KEY_ENCRYPTION_SECRET` are generated by Render.
+Set `SITE_URL` to the Render URL for correct SEO links.
+
+> **Render free tier is ephemeral: the SQLite file resets on redeploy**
+> (same as the Nexora Render setup). For persistent data the site needs a
+> persistent disk or a hosted Postgres database — a later step, not part
+> of Phase 1.
+
+## Project structure
+
+```
+src/
+  app/            pages + API routes (auth, enroll, community, chat, …)
+  components/     Nav, Footer, LockedPreview, Countdown, FaqList, …
+  lib/
+    config.js     every [Placeholder] in one place
+    db.js         THE ONLY file that touches the database (SQLite → Postgres later)
+    auth.js       sessions, password hashing, reset tokens
+    access.js     the Section 8 access matrix, one reusable place
+    keys.js       Course Key generation / verification
+    drive.js      Google Drive link validation + embed URLs
+    faq-data.js   the 11 FAQ questions
+    utils.js      small helpers (time-ago, slugs)
+public/uploads/   profile + post pictures (created at runtime)
+data/             learnchart.db (created at runtime, git-ignored)
+```
+
+## Code style
+
+Clean structure by concern; a short comment above **every file, every
+function, and every non-obvious logic block** (what it does + why);
+clear English names; no messy/spaghetti code — so any developer can read
+and change it.
