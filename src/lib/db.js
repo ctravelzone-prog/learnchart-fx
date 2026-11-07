@@ -14,14 +14,33 @@ import path from "node:path";
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), "data", "learnchart.db");
 
-// Make sure the data folder exists before opening the file.
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+// --- Lazy database handle ----------------------------------------------
+// The database is opened on FIRST USE, never at import time. That
+// matters because `next build` imports every page/API module in
+// parallel workers to collect page data — if each import opened the
+// same SQLite file and ran schema/seed writes, the workers locked
+// each other out ("database is locked", which failed the Render
+// deploy). During a build (NEXT_PHASE = phase-production-build) we
+// open a throwaway in-memory database instead: build-time rendering
+// only needs the seed data, and each worker gets its own copy, so no
+// file contention is possible at all. At runtime (dev / `next start`)
+// the real file on disk is used, exactly as before.
+let db = null;
 
-const db = new DatabaseSync(DB_PATH);
-db.exec("PRAGMA journal_mode = WAL;");
-db.exec("PRAGMA busy_timeout = 10000;");
-db.exec("PRAGMA synchronous = NORMAL;");
-db.exec("PRAGMA foreign_keys = ON;");
+function openDatabase() {
+  const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+  const file = isBuild ? ":memory:" : DB_PATH;
+  if (!isBuild) {
+    // Make sure the data folder exists before opening the file.
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  }
+  const handle = new DatabaseSync(file);
+  handle.exec("PRAGMA journal_mode = WAL;");
+  handle.exec("PRAGMA busy_timeout = 10000;");
+  handle.exec("PRAGMA synchronous = NORMAL;");
+  handle.exec("PRAGMA foreign_keys = ON;");
+  return handle;
+}
 
 // --- Schema ---------------------------------------------------------------
 // One table per prompt Section 20. Every gated check reads `enrollments`;
@@ -172,11 +191,11 @@ CREATE TABLE IF NOT EXISTS password_resets (
 // --- Seed: the three offers from prompt Section 10 ------------------------
 // Courses/services are DATABASE records (not hard-coded blocks) so the
 // later master admin can add/edit them without a rebuild.
-function seed() {
-  const count = db.prepare("SELECT COUNT(*) AS c FROM courses_services").get().c;
+function seed(handle) {
+  const count = handle.prepare("SELECT COUNT(*) AS c FROM courses_services").get().c;
   if (count > 0) return; // already seeded — never re-seed over live data
 
-  const insertCourse = db.prepare(
+  const insertCourse = handle.prepare(
     "INSERT INTO courses_services (slug, title, subtitle, level, status, price_label, price_cents, button_type, button_label, features_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
 
@@ -261,7 +280,7 @@ function seed() {
     ["[Placeholder — lesson title]", "9 min", ""],
     ["[Placeholder — lesson title]", "9 min", ""],
   ];
-  const insertLesson = db.prepare(
+  const insertLesson = handle.prepare(
     "INSERT INTO lessons (course_id, position, title, duration, youtube_id, description) VALUES (?, ?, ?, ?, '', ?)"
   );
   lessons.forEach(([title, duration, description], i) => {
@@ -270,7 +289,7 @@ function seed() {
 
   // A welcome message in the Mentor Special Chat so the room is not
   // empty on first open. Marked as a mentor message.
-  db.prepare(
+  handle.prepare(
     "INSERT INTO special_chat_messages (user_id, text, is_mentor) VALUES (NULL, ?, 1)"
   ).run(
     "Welcome to the Mentor Special Chat — Siam Chowdhury & Rex Mizan answer here during live sessions. Mention @Mentor and your question gets picked up live."
@@ -284,11 +303,11 @@ function seed() {
 function sleepMs(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
-function initDatabase() {
+function initDatabase(handle) {
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
-      db.exec(SCHEMA);
-      seed();
+      handle.exec(SCHEMA);
+      seed(handle);
       return;
     } catch (err) {
       const busy = err && (err.errcode === 5 || /locked|busy/i.test(err.message || ""));
@@ -300,42 +319,47 @@ function initDatabase() {
     }
   }
 }
-initDatabase();
 
 // --- Tiny query helpers (keeps SQL in this file) --------------------------
 export function getDb() {
+  // First use opens the connection (real file at runtime, in-memory
+  // during `next build`) and creates/seeds the schema if needed.
+  if (!db) {
+    db = openDatabase();
+    initDatabase(db);
+  }
   return db;
 }
 
 export function getCourseBySlug(slug) {
-  const row = db.prepare("SELECT * FROM courses_services WHERE slug = ?").get(slug);
+  const row = getDb().prepare("SELECT * FROM courses_services WHERE slug = ?").get(slug);
   if (!row) return null;
   return { ...row, features: JSON.parse(row.features_json || "[]") };
 }
 
 export function getAllCourses() {
-  return db
+  return getDb()
     .prepare("SELECT * FROM courses_services ORDER BY sort_order ASC")
     .all()
     .map((row) => ({ ...row, features: JSON.parse(row.features_json || "[]") }));
 }
 
 export function getLessons(courseId) {
-  return db
+  return getDb()
     .prepare("SELECT * FROM lessons WHERE course_id = ? ORDER BY position ASC")
     .all(courseId);
 }
 
 export function getUserById(id) {
-  return db.prepare("SELECT id, name, email, profile_pic, created_at FROM users WHERE id = ?").get(id) || null;
+  return getDb().prepare("SELECT id, name, email, profile_pic, created_at FROM users WHERE id = ?").get(id) || null;
 }
 
 export function getUserByEmail(email) {
-  return db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase()) || null;
+  return getDb().prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase()) || null;
 }
 
 export function getEnrollments(userId) {
-  return db
+  return getDb()
     .prepare(
       `SELECT e.*, c.slug AS course_slug, c.title AS course_title
        FROM enrollments e JOIN courses_services c ON c.id = e.course_id
@@ -346,7 +370,7 @@ export function getEnrollments(userId) {
 
 export function hasEnrollment(userId, courseSlug) {
   if (!userId) return false;
-  const row = db
+  const row = getDb()
     .prepare(
       `SELECT e.id FROM enrollments e
        JOIN courses_services c ON c.id = e.course_id
