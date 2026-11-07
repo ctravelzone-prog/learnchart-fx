@@ -12,6 +12,7 @@ import { getLessons, getCourseBySlug } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import { canWatchCourseVideos, getForexEnrollment } from "../../lib/access.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
+import LessonPlayer from "../../components/LessonPlayer.jsx";
 
 export const metadata = {
   title: "Course Videos — LearnChart FX",
@@ -104,6 +105,19 @@ export default async function CourseVideosPage({ searchParams }) {
       <p className="muted small">
         Videos are streamed from YouTube (Unlisted) — nothing is uploaded to this site. Watch them in order, one lesson at a time.
       </p>
+      {/* Player for Lesson 1 (design's .yt-player): cover photo + play button.
+          Play loads the real embed only when unlocked with a real video ID.
+          NOTE: only plain values (strings/numbers) are passed to this client
+          component — node:sqlite row objects are null-prototype and React
+          refuses them as client-component props. */}
+      {lessons.length > 0 ? (
+        <LessonPlayer
+          title={lessons[0].title}
+          position={lessons[0].position}
+          youtubeId={lessons[0].youtube_id || ""}
+          unlocked={unlocked}
+        />
+      ) : null}
       {lessons.map((lesson) => (
         <div className={`lesson ${unlocked ? "" : "locked"}`} key={lesson.id}>
           <span className="num">{unlocked ? "▶" : "🔒"}</span>

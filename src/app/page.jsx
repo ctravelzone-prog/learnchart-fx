@@ -11,6 +11,16 @@ import { SITE, STATS, SOCIALS, BROKERS, TESTIMONIALS, INSIDE_VIDEO_ID } from "..
 import { FAQ_HOME_PREVIEW } from "../lib/faq-data.js";
 import Countdown from "../components/Countdown.jsx";
 import Testimonials from "../components/Testimonials.jsx";
+import InsideVideoCover from "../components/InsideVideoCover.jsx";
+
+// Course card banner photos — the design's course images, by course slug.
+// (Design file: forex card = mentor at desk, live-trade card = studio
+// broadcast, consultation card = one-on-one video call.)
+const COURSE_IMAGES = {
+  "forex-premium-course": { src: "/images/mentor-desk.webp", alt: "Forex Trading Premium Course with mentor Siam Chowdhury" },
+  "premium-live-trade-support": { src: "/images/mentor-studio.webp", alt: "Premium Live Trade Support — mentor live in the trading studio" },
+  "trading-consultation": { src: "/images/consultation-call.webp", alt: "Trading Consultation — one-on-one session with the mentor" },
+};
 
 export const metadata = {
   title: "LearnChart FX — Mastering Trading With Experts",
@@ -58,21 +68,32 @@ export default async function HomePage() {
 
       <div className="dots" />
 
-      {/* 3 — Featured course showcase */}
+      {/* 3 — Featured course showcase (design: feat-card + info panel) */}
       <section className="wrap section">
         <div className="grid-2">
           <div className="card">
-            <span className="badge badge-amber">Featured</span>
-            <h2 style={{ marginTop: 12 }}>LEARNCHART FX #01</h2>
-            <p className="muted">
-              Boost your trading skills with LearnChart FX. Learn trading strategies,
-              expert market analysis, and risk management with a clear plan, every day.
-            </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Link href="/courses" className="btn btn-amber">▶ Join Course</Link>
-              <Link href="/faq" className="btn btn-dark">Learn more</Link>
+            <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 14, alignItems: "center" }}>
+              <div>
+                <span className="badge badge-amber">Featured</span>
+                <h2 style={{ marginTop: 12 }}>LEARNCHART FX #01</h2>
+                <p className="muted">
+                  Boost your trading skills with LearnChart FX. Learn trading strategies,
+                  expert market analysis, and risk management with a clear plan, every day.
+                </p>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <Link href="/courses" className="btn btn-amber">▶ Join Course</Link>
+                  <Link href="/faq" className="btn btn-dark">Learn more</Link>
+                </div>
+              </div>
+              <div className="feat-photo">
+                <img src="/images/mentor-desk.webp" alt="Mentor Siam Chowdhury at his trading desk with candlestick charts on the monitors" />
+              </div>
             </div>
             <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+              <div className="sc-img">
+                <img src="/images/mentor-studio.webp" alt="Trading mindset lesson — mentor teaching trading psychology" loading="lazy" />
+                <span className="dur">1.5 hrs</span>
+              </div>
               <span className="chip">9. TRADING MINDSET</span>
               <p style={{ margin: "8px 0 0" }}>
                 <strong>Master trading psychology.</strong>{" "}
@@ -84,6 +105,12 @@ export default async function HomePage() {
               <p style={{ margin: "8px 0" }}><strong>PREMIUM COURSE CURRICULUM</strong></p>
               <a href="/api/curriculum" className="btn btn-dark btn-sm">DOWNLOAD PDF ⬇</a>
             </div>
+            <div className="feat-strip">
+              <div className="fthumb"><img src="/images/mentor-desk.webp" alt="Lesson 1 — starting your trading journey" loading="lazy" /><b>1</b></div>
+              <div className="fthumb"><img src="/images/mentor-rex.webp" alt="Lesson 2 — market structure basics" loading="lazy" /><b>2</b></div>
+              <div className="fthumb"><img src="/images/mentor-studio.webp" alt="Lesson 3 — live trade analysis" loading="lazy" /><b>3</b></div>
+              <div className="fthumb"><img src="/images/consultation-call.webp" alt="Lesson 4 — trading psychology" loading="lazy" /><b>4</b></div>
+            </div>
           </div>
           <div className="card">
             <h3>LEARNCHART FX</h3>
@@ -93,8 +120,16 @@ export default async function HomePage() {
               <span className="chip">1.5 hrs</span>
             </div>
             <div style={{ marginTop: 16 }}>
-              <div className="lesson"><span className="num">1</span><div><strong>Starting Your Trading Journey</strong></div></div>
-              <div className="lesson"><span className="num">2</span><div><strong>Mastering Trading Psychology</strong></div></div>
+              <div className="lesson-row">
+                <img src="/images/mentor-desk.webp" alt="" loading="lazy" />
+                <b>Starting Your Trading Journey</b>
+                <span className="num">1</span>
+              </div>
+              <div className="lesson-row">
+                <img src="/images/consultation-call.webp" alt="" loading="lazy" />
+                <b>Mastering Trading Psychology</b>
+                <span className="num">2</span>
+              </div>
             </div>
             <p className="small muted">90% — of learners follow the lessons in order, one lesson at a time.</p>
           </div>
@@ -123,6 +158,12 @@ export default async function HomePage() {
         <div className="grid-3">
           {courses.map((c) => (
             <div className="card" key={c.slug}>
+              {COURSE_IMAGES[c.slug] ? (
+                <div className="course-thumb">
+                  <img src={COURSE_IMAGES[c.slug].src} alt={COURSE_IMAGES[c.slug].alt} loading="lazy" />
+                  {c.slug === "forex-premium-course" ? <span className="badge badge-amber thumb-badge">★ BESTSELLER</span> : null}
+                </div>
+              ) : null}
               <h3>{c.title}</h3>
               <p className="muted small">{c.subtitle}</p>
               <ul className="check-list">
@@ -140,12 +181,14 @@ export default async function HomePage() {
       {/* 6 — Build a Successful Trading Career (mentors, open to all) */}
       <section className="wrap section">
         <div className="grid-2">
-          <div className="card center">
-            <div className="avatar" style={{ width: 84, height: 84, fontSize: 32, margin: "0 auto 12px" }}>SR</div>
-            <h3>Siam Chowdhury &amp; Rex Mizan — your mentors</h3>
-            <div style={{ marginTop: 10 }}>
-              <span className="chip">FOREX</span><span className="chip">FUTURES</span>
-              <span className="chip">STOCKS</span><span className="chip">OPTIONS</span>
+          <div className="career-photo">
+            <img src="/images/mentor-desk.webp" alt="Siam Chowdhury, head mentor of LearnChart FX" loading="lazy" />
+            <div className="career-bar">
+              <div><b>Siam Chowdhury</b> <span className="muted">&amp; Rex Mizan — your mentors</span></div>
+              <div style={{ marginTop: 10 }}>
+                <span className="chip">FOREX</span><span className="chip">FUTURES</span>
+                <span className="chip">STOCKS</span><span className="chip">OPTIONS</span>
+              </div>
             </div>
           </div>
           <div>
@@ -209,9 +252,7 @@ export default async function HomePage() {
         <SectionTitle>&ldquo;Inside LearnChart FX&rdquo;</SectionTitle>
         <div className="card">
           {INSIDE_VIDEO_ID === "[Placeholder]" ? (
-            <div className="video-wrap" style={{ display: "grid", placeItems: "center", color: "var(--muted)" }}>
-              <p>[Placeholder — YouTube video ID not provided yet]</p>
-            </div>
+            <InsideVideoCover />
           ) : (
             <div className="video-wrap">
               <iframe

@@ -17,6 +17,9 @@ export const SITE = {
 
 // Mentors — photos, bios, role lines and focus tags are [Placeholder]
 // until Siam provides the real ones. No profit claims, ever.
+// NOTE: the photos below are DESIGN STAND-INS from the UI/UX design
+// file (AI-generated stand-in portraits), NOT real photos of Siam or
+// Rex — replace them with real photos when Siam provides them.
 export const MENTORS = [
   {
     id: "siam",
@@ -31,7 +34,7 @@ export const MENTORS = [
       "London session live, Mon–Fri",
       "Daily plan in the Mentor Special Chat",
     ],
-    photo: null, // [Placeholder — mentor photo]
+    photo: "/images/mentor-desk.webp", // design stand-in — replace with Siam's real photo
   },
   {
     id: "rex",
@@ -46,7 +49,7 @@ export const MENTORS = [
       "Trade journal & risk reviews",
       "Weekly planning session co-host",
     ],
-    photo: null, // [Placeholder — mentor photo]
+    photo: "/images/mentor-rex.webp", // design stand-in — replace with Rex's real photo
   },
 ];
 

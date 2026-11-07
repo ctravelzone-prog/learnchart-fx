@@ -123,6 +123,9 @@ export default async function ConsultationPage({ searchParams }) {
         </div>
 
         <div>
+          <div className="consult-media">
+            <img src="/images/consultation-call.webp" alt="A student in a one-on-one video consultation with the mentor, charts open beside the laptop" loading="lazy" />
+          </div>
           <div className="card" style={{ marginBottom: 16 }}>
             <h3>What you get</h3>
             <ul className="check-list">

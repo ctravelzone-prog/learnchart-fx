@@ -9,6 +9,13 @@ import { getAllCourses, getEnrollments } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import { PAYMENT_METHOD } from "../../lib/config.js";
 
+// Course card banner photos — the design's course images, by course slug.
+const COURSE_IMAGES = {
+  "forex-premium-course": { src: "/images/mentor-desk.webp", alt: "Forex Trading Premium Course with mentor Siam Chowdhury" },
+  "premium-live-trade-support": { src: "/images/mentor-studio.webp", alt: "Premium Live Trade Support — mentor live in the trading studio" },
+  "trading-consultation": { src: "/images/consultation-call.webp", alt: "Trading Consultation — one-on-one session with the mentor" },
+};
+
 export const metadata = {
   title: "Courses & Services — LearnChart FX",
   description:
@@ -46,7 +53,12 @@ export default async function CoursesPage() {
       <div className="grid-3" style={{ marginTop: 28 }}>
         {courses.map((c) => (
           <div className="card" key={c.slug}>
-            {c.slug === "forex-premium-course" ? <span className="badge badge-amber">★ BESTSELLER</span> : null}
+            {COURSE_IMAGES[c.slug] ? (
+              <div className="course-thumb">
+                <img src={COURSE_IMAGES[c.slug].src} alt={COURSE_IMAGES[c.slug].alt} />
+                {c.slug === "forex-premium-course" ? <span className="badge badge-amber thumb-badge">★ BESTSELLER</span> : null}
+              </div>
+            ) : null}
             <h2 style={{ marginTop: 10 }}>{c.title}</h2>
             <p className="muted small">{c.subtitle}</p>
             <p>

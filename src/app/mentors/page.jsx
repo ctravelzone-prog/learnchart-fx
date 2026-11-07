@@ -28,6 +28,14 @@ export default function MentorsPage() {
         {MENTORS.map((m) => (
           <div className="card" key={m.id}>
             <span className="badge badge-amber">{m.badge}</span>
+            {/* Mentor photo: a DESIGN STAND-IN from the UI/UX design file
+                (AI-generated stand-in portrait), NOT a real photo of the
+                mentor — replace with the real photo when Siam provides it. */}
+            {m.photo ? (
+              <div className="mentor-photo" style={{ marginTop: 14 }}>
+                <img src={m.photo} alt={`${m.name}, mentor at LearnChart FX`} />
+              </div>
+            ) : null}
             <div style={{ display: "flex", gap: 14, marginTop: 14, alignItems: "center" }}>
               <span className="avatar" style={{ width: 72, height: 72, fontSize: 26 }}>
                 {m.name.split(" ").map((w) => w[0]).join("")}
@@ -44,7 +52,6 @@ export default function MentorsPage() {
             <ul className="check-list">
               {m.points.map((p) => (<li key={p}>{p}</li>))}
             </ul>
-            <p className="small muted">[Placeholder — mentor photo]</p>
           </div>
         ))}
       </div>

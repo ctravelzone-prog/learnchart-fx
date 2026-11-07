@@ -47,8 +47,17 @@ export default async function LiveRoomPage() {
       <p><span className="badge badge-green">🔓 Live Room unlocked</span> <span className="muted small">Your Premium Live Trade Support enrollment gives you full access to every live session below.</span></p>
 
       <div className="card">
-        <span className="badge badge-amber">NEXT LIVE</span>
-        <h2 style={{ marginTop: 10 }}>Premium Live Trade — Daily Sessions</h2>
+        <div className="stage-img">
+          <img src="/images/mentor-studio.webp" alt="Mentor broadcasting live from the trading studio with a large candlestick chart behind him" />
+          <span className="badge badge-amber stage-badge">NEXT LIVE</span>
+          <div className="stage-foot">
+            <div>
+              <b>Premium Live Trade — Daily Sessions</b>
+              <div className="small muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</div>
+            </div>
+          </div>
+        </div>
+        <h2 style={{ marginTop: 16 }}>Premium Live Trade — Daily Sessions</h2>
         <p className="muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</p>
         <div className="alert alert-info">
           Live stream provider: <strong>{LIVE_STREAM_PROVIDER}</strong> — the live player will appear here once Siam confirms the streaming provider.
