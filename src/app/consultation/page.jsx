@@ -65,7 +65,7 @@ export default async function ConsultationPage({ searchParams }) {
 
       {sp?.booked === "1" ? (
         <div className="alert alert-ok">
-          Your consultation request is ready. Copy it and send it to the mentor team — they will confirm your live audio/video slot.
+          Your consultation request is saved. The mentor team will confirm your slot here — check back for the Confirmed status and your Join link.
         </div>
       ) : null}
       {sp?.error ? <div className="alert alert-error">{sp.error}</div> : null}
@@ -142,8 +142,26 @@ export default async function ConsultationPage({ searchParams }) {
                 const details = `LearnChart FX consultation request — ${r.name}: ${r.topic} (${r.mode}) on ${r.preferred_date} at ${r.preferred_time} Dhaka. Note: ${r.note || "-"}`;
                 return (
                   <div key={r.id} style={{ borderTop: "1px solid var(--line)", paddingTop: 10, marginTop: 10 }}>
-                    <strong>{r.topic}</strong> · {r.mode}
-                    <div className="small muted">{r.preferred_date} at {r.preferred_time} (Dhaka)</div>
+                    <strong>{r.topic}</strong> · {r.mode}{" "}
+                    {/* Admin decision (Nov 2026): pending -> confirmed /
+                        rejected. Confirmed shows the slot the admin set
+                        plus a Join button with the exact meeting link. */}
+                    {r.status === "confirmed" ? <span className="badge badge-green">Confirmed</span>
+                      : r.status === "rejected" ? <span className="badge">Rejected</span>
+                      : <span className="badge badge-amber">Pending</span>}
+                    <div className="small muted">Requested: {r.preferred_date} at {r.preferred_time} (Dhaka)</div>
+                    {r.status === "confirmed" ? (
+                      <div style={{ marginTop: 8 }}>
+                        <div>Confirmed: <strong>{r.confirmed_date} at {r.confirmed_time} (Dhaka)</strong></div>
+                        <a href={r.meeting_link} target="_blank" rel="noopener noreferrer" className="btn btn-amber btn-sm" style={{ marginTop: 8 }}>Join live session →</a>
+                      </div>
+                    ) : null}
+                    {r.admin_note ? (
+                      <div className="small" style={{ marginTop: 8 }}>Mentor team: {r.admin_note}</div>
+                    ) : null}
+                    {r.status === "rejected" && !r.admin_note ? (
+                      <div className="small muted" style={{ marginTop: 8 }}>This request was not confirmed — please book another slot.</div>
+                    ) : null}
                     <div style={{ marginTop: 8 }}><CopyRequest details={details} /></div>
                   </div>
                 );

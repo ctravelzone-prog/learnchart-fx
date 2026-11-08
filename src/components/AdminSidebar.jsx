@@ -14,7 +14,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-// Grouped links — same 14 destinations as before, nothing added or removed.
+// Grouped links — same destinations as before, plus Consultations
+// (Nov 2026): booking requests from Trading Consultation members.
 const GROUPS = [
   {
     label: "Overview",
@@ -49,6 +50,7 @@ const GROUPS = [
     label: "Community",
     links: [
       ["/admin/community", "Community"],
+      ["/admin/consultations", "Consultations"],
       ["/admin/contact", "Contact Inbox"],
     ],
   },

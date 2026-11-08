@@ -34,6 +34,7 @@ export default async function AdminDashboardPage() {
         <div className="card stat-card"><b>{stats.users}</b><span className="muted">Total Users</span></div>
         <div className="card stat-card"><b>{stats.posts}</b><span className="muted">Community Posts</span></div>
         <div className="card stat-card"><b>{stats.unreadContact}</b><span className="muted">Unread Contact Messages</span></div>
+        <div className="card stat-card"><b>{stats.pendingConsultations}</b><span className="muted">Pending Consultation Requests</span></div>
       </div>
 
       <div className="grid-2" style={{ marginTop: 20 }}>
@@ -68,6 +69,7 @@ export default async function AdminDashboardPage() {
           <Link href="/admin/payment-settings" className="btn btn-dark btn-sm">Payment Settings</Link>
           <Link href="/admin/settings" className="btn btn-dark btn-sm">Site Settings</Link>
           <Link href="/admin/contact" className="btn btn-dark btn-sm">Contact Inbox ({stats.unreadContact} new)</Link>
+          <Link href="/admin/consultations" className="btn btn-dark btn-sm">Consultations ({stats.pendingConsultations} pending)</Link>
           <Link href="/admin/status" className="btn btn-dark btn-sm">Payment &amp; Email Status</Link>
         </div>
       </div>

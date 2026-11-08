@@ -295,6 +295,18 @@ CREATE TABLE IF NOT EXISTS consultation_requests (
   preferred_time TEXT NOT NULL,
   name TEXT NOT NULL,
   note TEXT NOT NULL DEFAULT '',
+  -- Admin decision (Nov 2026): requests used to sit here invisible —
+  -- there was no admin view at all. Status flow: pending -> confirmed /
+  -- rejected. On confirm the admin pastes the meeting link (any provider
+  -- the admin creates — Google Meet / Zoom / other; the site creates no
+  -- links itself) plus the confirmed slot; the user then sees a
+  -- "Join live session" button. admin_note is shown to the user too.
+  status TEXT NOT NULL DEFAULT 'pending',
+  meeting_link TEXT NOT NULL DEFAULT '',
+  confirmed_date TEXT NOT NULL DEFAULT '',
+  confirmed_time TEXT NOT NULL DEFAULT '',
+  admin_note TEXT NOT NULL DEFAULT '',
+  decided_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -565,6 +577,22 @@ function migrateColumns(handle) {
   const contactCols = handle.prepare("PRAGMA table_info(contact_messages)").all().map((c) => c.name);
   if (!contactCols.includes("status")) {
     handle.exec("ALTER TABLE contact_messages ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
+  }
+  // Consultation decision columns (Nov 2026): older databases have the
+  // requests table but no status / meeting link — add them so old
+  // requests show up as pending in the new admin Consultations section.
+  const consultCols = handle.prepare("PRAGMA table_info(consultation_requests)").all().map((c) => c.name);
+  for (const [col, def] of [
+    ["status", "TEXT NOT NULL DEFAULT 'pending'"],
+    ["meeting_link", "TEXT NOT NULL DEFAULT ''"],
+    ["confirmed_date", "TEXT NOT NULL DEFAULT ''"],
+    ["confirmed_time", "TEXT NOT NULL DEFAULT ''"],
+    ["admin_note", "TEXT NOT NULL DEFAULT ''"],
+    ["decided_at", "TEXT"],
+  ]) {
+    if (!consultCols.includes(col)) {
+      handle.exec(`ALTER TABLE consultation_requests ADD COLUMN ${col} ${def}`);
+    }
   }
   // Course flags added with the admin panel (Nov 2026): video lessons +
   // Course Key (has_videos), area unlocked (unlocks), card image + badge.
@@ -928,7 +956,8 @@ export function getAdminStats() {
     .all();
   const posts = db.prepare("SELECT COUNT(*) AS c FROM posts").get().c;
   const unreadContact = db.prepare("SELECT COUNT(*) AS c FROM contact_messages WHERE status = 'new'").get().c;
-  return { users, enrollmentsByCourse, paymentsByMethod, posts, unreadContact };
+  const pendingConsultations = db.prepare("SELECT COUNT(*) AS c FROM consultation_requests WHERE status = 'pending'").get().c;
+  return { users, enrollmentsByCourse, paymentsByMethod, posts, unreadContact, pendingConsultations };
 }
 
 export function listUsers(search) {
@@ -1052,6 +1081,31 @@ export function listContactMessages() {
 
 export function getContactMessage(id) {
   return getDb().prepare("SELECT * FROM contact_messages WHERE id = ?").get(id) || null;
+}
+
+// --- Consultation requests (admin) -------------------------------------
+// One row per booking request, newest first, with the member's name and
+// email joined in. Optional status filter: pending / confirmed / rejected.
+export function listConsultationRequests(status) {
+  const where = status ? "WHERE r.status = ?" : "";
+  const args = status ? [status] : [];
+  return getDb()
+    .prepare(
+      `SELECT r.*, u.name AS user_name, u.email AS user_email
+       FROM consultation_requests r JOIN users u ON u.id = r.user_id
+       ${where} ORDER BY r.created_at DESC`
+    )
+    .all(...args);
+}
+
+export function getConsultationRequest(id) {
+  const row = getDb()
+    .prepare(
+      `SELECT r.*, u.name AS user_name, u.email AS user_email
+       FROM consultation_requests r JOIN users u ON u.id = r.user_id WHERE r.id = ?`
+    )
+    .get(id);
+  return row || null;
 }
 
 export function getAllLessons() {
