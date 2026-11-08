@@ -4,7 +4,7 @@
 // the user is logged in and sent to their profile (or back to the
 // enrollment they started, via ?next=).
 // ---------------------------------------------------------------------------
-import { NextResponse } from "next/server";
+import { redirectTo } from "../../../../lib/http.js";
 import { getDb, getUserByEmail } from "../../../../lib/db.js";
 import { hashPassword, createSession } from "../../../../lib/auth.js";
 
@@ -17,16 +17,10 @@ export async function POST(request) {
 
   // Basic validation — never trust the browser alone.
   if (!name || !email.includes("@") || password.length < 8) {
-    return NextResponse.redirect(
-      new URL(`/signup?error=${encodeURIComponent("Name, a valid email and a password of 8+ characters are required.")}`, request.url),
-      303
-    );
+    return redirectTo(`/signup?error=${encodeURIComponent("Name, a valid email and a password of 8+ characters are required.")}`);
   }
   if (getUserByEmail(email)) {
-    return NextResponse.redirect(
-      new URL(`/signup?error=${encodeURIComponent("An account with this email already exists. Please log in.")}`, request.url),
-      303
-    );
+    return redirectTo(`/signup?error=${encodeURIComponent("An account with this email already exists. Please log in.")}`);
   }
 
   const { hash, salt } = hashPassword(password);
@@ -36,5 +30,5 @@ export async function POST(request) {
 
   await createSession(id);
   const dest = next.startsWith("/") ? next : "/profile";
-  return NextResponse.redirect(new URL(dest, request.url), 303);
+  return redirectTo(dest);
 }

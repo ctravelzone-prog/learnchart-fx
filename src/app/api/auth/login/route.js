@@ -2,7 +2,7 @@
 // api/auth/login — check email + password, then create a session.
 // Wrong credentials give one generic error (never say which half failed).
 // ---------------------------------------------------------------------------
-import { NextResponse } from "next/server";
+import { redirectTo } from "../../../../lib/http.js";
 import { getUserByEmail } from "../../../../lib/db.js";
 import { verifyPassword, createSession } from "../../../../lib/auth.js";
 
@@ -15,13 +15,10 @@ export async function POST(request) {
   const user = getUserByEmail(email);
   const ok = user && verifyPassword(password, user.password_hash, user.password_salt);
   if (!ok) {
-    return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent("Invalid email or password.")}`, request.url),
-      303
-    );
+    return redirectTo(`/login?error=${encodeURIComponent("Invalid email or password.")}`);
   }
 
   await createSession(user.id);
   const dest = next.startsWith("/") ? next : "/profile";
-  return NextResponse.redirect(new URL(dest, request.url), 303);
+  return redirectTo(dest);
 }

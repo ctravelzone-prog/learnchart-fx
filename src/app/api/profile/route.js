@@ -4,7 +4,7 @@
 // so uploads stay small, and saved under /public/uploads/profiles/.
 // Any other file type (including video) is rejected server-side.
 // ---------------------------------------------------------------------------
-import { NextResponse } from "next/server";
+import { redirectTo } from "../../../lib/http.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -17,19 +17,16 @@ const MAX_BYTES = 5 * 1024 * 1024;
 
 export async function POST(request) {
   const user = await getSessionUser();
-  if (!user) return NextResponse.redirect(new URL("/login?next=/profile", request.url), 303);
+  if (!user) return redirectTo("/login?next=/profile");
 
   const form = await request.formData();
   const file = form.get("picture");
   if (!file || typeof file === "string" || file.size === 0) {
-    return NextResponse.redirect(new URL("/profile?error=" + encodeURIComponent("Please choose an image file."), request.url), 303);
+    return redirectTo("/profile?error=" + encodeURIComponent("Please choose an image file."));
   }
   // Server-side validation: images only, size limit. Video is rejected.
   if (!ALLOWED.has(file.type) || file.size > MAX_BYTES) {
-    return NextResponse.redirect(
-      new URL("/profile?error=" + encodeURIComponent("Only image files (JPG, PNG, WebP, GIF) up to 5 MB are allowed."), request.url),
-      303
-    );
+    return redirectTo("/profile?error=" + encodeURIComponent("Only image files (JPG, PNG, WebP, GIF) up to 5 MB are allowed."));
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -41,5 +38,5 @@ export async function POST(request) {
   await sharp(buffer).resize(256, 256, { fit: "cover" }).toFile(path.join(dir, name));
   const url = `/uploads/profiles/${name}`;
   getDb().prepare("UPDATE users SET profile_pic = ? WHERE id = ?").run(url, user.id);
-  return NextResponse.redirect(new URL("/profile?saved=1", request.url), 303);
+  return redirectTo("/profile?saved=1");
 }

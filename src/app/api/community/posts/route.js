@@ -7,7 +7,7 @@
 // real Drive link) and stored as a file id only — the video streams from
 // Drive, never from this hosting.
 // ---------------------------------------------------------------------------
-import { NextResponse } from "next/server";
+import { redirectTo } from "../../../../lib/http.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -23,7 +23,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 export async function POST(request) {
   const user = await getSessionUser();
   if (!user || !canEnterCommunity(user.id)) {
-    return NextResponse.redirect(new URL("/community", request.url), 303);
+    return redirectTo("/community");
   }
   const form = await request.formData();
   const text = String(form.get("text") || "").trim();
@@ -32,10 +32,10 @@ export async function POST(request) {
 
   // A post needs text, a picture, or a Drive video — not an empty post.
   if (!text && (!file || typeof file === "string" || file.size === 0) && !driveUrl) {
-    return NextResponse.redirect(new URL("/community?error=" + encodeURIComponent("Write something, add a picture, or paste a Drive video link."), request.url), 303);
+    return redirectTo("/community?error=" + encodeURIComponent("Write something, add a picture, or paste a Drive video link."));
   }
   if (text.length > 5000) {
-    return NextResponse.redirect(new URL("/community?error=" + encodeURIComponent("Post text is too long (max 5000 characters)."), request.url), 303);
+    return redirectTo("/community?error=" + encodeURIComponent("Post text is too long (max 5000 characters)."));
   }
 
   // Drive link: must be a real Google Drive link, or the post is refused.
@@ -43,10 +43,7 @@ export async function POST(request) {
   if (driveUrl) {
     driveFileId = parseDriveFileId(driveUrl);
     if (!driveFileId) {
-      return NextResponse.redirect(
-        new URL("/community?error=" + encodeURIComponent("That is not a valid Google Drive video link. Paste a link to a video in your own Google Drive, and set its sharing to 'Anyone with the link can view'."), request.url),
-        303
-      );
+      return redirectTo("/community?error=" + encodeURIComponent("That is not a valid Google Drive video link. Paste a link to a video in your own Google Drive, and set its sharing to 'Anyone with the link can view'."));
     }
   }
 
@@ -54,10 +51,7 @@ export async function POST(request) {
   let imagePath = null;
   if (file && typeof file !== "string" && file.size > 0) {
     if (!ALLOWED_IMAGE.has(file.type) || file.size > MAX_BYTES) {
-      return NextResponse.redirect(
-        new URL("/community?error=" + encodeURIComponent("Pictures only (JPG, PNG, WebP, GIF up to 5 MB). Video upload is not allowed — paste a Google Drive link instead."), request.url),
-        303
-      );
+      return redirectTo("/community?error=" + encodeURIComponent("Pictures only (JPG, PNG, WebP, GIF up to 5 MB). Video upload is not allowed — paste a Google Drive link instead."));
     }
     const buffer = Buffer.from(await file.arrayBuffer());
     const name = `${user.id}-${crypto.randomBytes(8).toString("hex")}.jpg`;
@@ -71,5 +65,5 @@ export async function POST(request) {
   getDb()
     .prepare("INSERT INTO posts (user_id, text, image_path, drive_file_id, drive_url) VALUES (?, ?, ?, ?, ?)")
     .run(user.id, text, imagePath, driveFileId, driveUrl || null);
-  return NextResponse.redirect(new URL("/community?posted=1", request.url), 303);
+  return redirectTo("/community?posted=1");
 }

@@ -4,7 +4,7 @@
 // There is no email service yet, so the reset link is shown on screen
 // after submit instead of emailed. The token is single-use, 24h.
 // ---------------------------------------------------------------------------
-import { NextResponse } from "next/server";
+import { redirectTo } from "../../../../lib/http.js";
 import { getUserByEmail } from "../../../../lib/db.js";
 import { createPasswordResetToken } from "../../../../lib/auth.js";
 
@@ -16,7 +16,7 @@ export async function POST(request) {
   if (user) {
     const token = createPasswordResetToken(user.id);
     const url = new URL(`/reset-password?token=${token}`, request.url);
-    return NextResponse.redirect(new URL(`/forgot-password?sent=1&link=${encodeURIComponent(url.pathname + url.search)}`, request.url), 303);
+    return redirectTo(`/forgot-password?sent=1&link=${encodeURIComponent(url.pathname + url.search)}`);
   }
-  return NextResponse.redirect(new URL("/forgot-password?sent=1", request.url), 303);
+  return redirectTo("/forgot-password?sent=1");
 }

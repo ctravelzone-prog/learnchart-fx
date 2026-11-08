@@ -8,7 +8,7 @@
 // for now the enrollment is recorded with payment_status noted as such.
 // Free services enroll on confirmation.
 // ---------------------------------------------------------------------------
-import { NextResponse } from "next/server";
+import { redirectTo } from "../../../lib/http.js";
 import { getDb, getCourseBySlug, hasEnrollment } from "../../../lib/db.js";
 import { getSessionUser } from "../../../lib/auth.js";
 import { generateCourseKey, hashKey, encryptKey } from "../../../lib/keys.js";
@@ -17,16 +17,16 @@ import { PAYMENT_METHOD } from "../../../lib/config.js";
 export async function POST(request) {
   const user = await getSessionUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login?next=/courses", request.url), 303);
+    return redirectTo("/login?next=/courses");
   }
   const form = await request.formData();
   const slug = String(form.get("slug") || "");
   const course = getCourseBySlug(slug);
   if (!course) {
-    return NextResponse.redirect(new URL("/courses", request.url), 303);
+    return redirectTo("/courses");
   }
   if (hasEnrollment(user.id, slug)) {
-    return NextResponse.redirect(new URL(`/enroll/${slug}/success`, request.url), 303);
+    return redirectTo(`/enroll/${slug}/success`);
   }
 
   const db = getDb();
@@ -47,5 +47,5 @@ export async function POST(request) {
       .run(enrollmentId, hashKey(key), encryptKey(key));
   }
 
-  return NextResponse.redirect(new URL(`/enroll/${slug}/success`, request.url), 303);
+  return redirectTo(`/enroll/${slug}/success`);
 }
