@@ -105,7 +105,11 @@ CREATE TABLE IF NOT EXISTS courses_services (
   has_videos INTEGER NOT NULL DEFAULT 0,
   unlocks TEXT NOT NULL DEFAULT 'none',
   image TEXT NOT NULL DEFAULT '',
-  badge TEXT NOT NULL DEFAULT ''
+  badge TEXT NOT NULL DEFAULT '',
+  -- Billing model (Nov 2026): 'one-time' = pay once, access forever;
+  -- 'monthly' = each payment buys 30 days (Private Live Trade).
+  -- The gates + enrollment code read this flag, never the slug.
+  billing TEXT NOT NULL DEFAULT 'one-time'
 );
 
 CREATE TABLE IF NOT EXISTS enrollments (
@@ -115,6 +119,10 @@ CREATE TABLE IF NOT EXISTS enrollments (
   status TEXT NOT NULL DEFAULT 'active',
   payment_status TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  -- Monthly expiry (Nov 2026): NULL = never expires (one-time courses).
+  -- A monthly enrollment is active only while expires_at > now; the
+  -- access checks in src/lib/access.js enforce that, not the status.
+  expires_at TEXT,
   UNIQUE(user_id, course_id)
 );
 
@@ -375,7 +383,7 @@ function seed(handle) {
   if (count > 0) return; // already seeded — never re-seed over live data
 
   const insertCourse = handle.prepare(
-    "INSERT INTO courses_services (slug, title, subtitle, level, status, price_label, price_cents, button_type, button_label, features_json, sort_order, has_videos, unlocks, image, badge) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO courses_services (slug, title, subtitle, level, status, price_label, price_cents, button_type, button_label, features_json, sort_order, has_videos, unlocks, image, badge, billing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
 
   const forexId = insertCourse.run(
@@ -401,7 +409,8 @@ function seed(handle) {
     1,
     "none",
     "/images/mentor-desk.webp",
-    "★ BESTSELLER"
+    "★ BESTSELLER",
+    "one-time"
   ).lastInsertRowid;
 
   insertCourse.run(
@@ -427,7 +436,11 @@ function seed(handle) {
     0,
     "live-room",
     "/images/mentor-studio.webp",
-    ""
+    "",
+    // Private Live Trade is a MONTHLY subscription (Nov 2026): $200
+    // buys 30 days; when it ends the student loses access and renews
+    // by paying again. Forex + Consultation stay one-time / free.
+    "monthly"
   );
 
   insertCourse.run(
@@ -453,7 +466,8 @@ function seed(handle) {
     0,
     "consultation",
     "/images/consultation-call.webp",
-    ""
+    "",
+    "one-time"
   );
 
   // 10 lessons, matching the "10 Lessons / 1.5 hrs" course shape.
@@ -551,6 +565,31 @@ function migrateColumns(handle) {
     handle.prepare("UPDATE courses_services SET image = '/images/mentor-desk.webp' WHERE slug = 'forex-premium-course' AND (image IS NULL OR image = '')").run();
     handle.prepare("UPDATE courses_services SET image = '/images/mentor-studio.webp' WHERE slug = 'private-live-trade' AND (image IS NULL OR image = '')").run();
     handle.prepare("UPDATE courses_services SET image = '/images/consultation-call.webp' WHERE slug = 'trading-consultation' AND (image IS NULL OR image = '')").run();
+  }
+
+  // Monthly billing (Nov 2026): 'one-time' by default; Private Live
+  // Trade is monthly. Runs only in the boot where the column is first
+  // added to an old database — never again after that, so an admin
+  // change to a course's billing is never reverted.
+  if (!courseCols.includes("billing")) {
+    handle.exec("ALTER TABLE courses_services ADD COLUMN billing TEXT NOT NULL DEFAULT 'one-time'");
+    handle.prepare("UPDATE courses_services SET billing = 'monthly' WHERE slug = 'private-live-trade'").run();
+  }
+
+  // Monthly expiry on enrollments (Nov 2026). Backfill: any EXISTING
+  // Private Live Trade enrollment gets 30 days from when it was
+  // created (its original payment bought one month). One-time courses
+  // keep expires_at NULL = never expires. Runs only in the boot where
+  // the column is first added.
+  const enrollmentCols = handle.prepare("PRAGMA table_info(enrollments)").all().map((c) => c.name);
+  if (!enrollmentCols.includes("expires_at")) {
+    handle.exec("ALTER TABLE enrollments ADD COLUMN expires_at TEXT");
+    handle
+      .prepare(
+        `UPDATE enrollments SET expires_at = datetime(created_at, '+30 days')
+         WHERE course_id IN (SELECT id FROM courses_services WHERE slug = 'private-live-trade')`
+      )
+      .run();
   }
 }
 
@@ -692,23 +731,73 @@ export function getEnrollments(userId) {
   return getDb()
     .prepare(
       `SELECT e.*, c.slug AS course_slug, c.title AS course_title,
-              c.has_videos AS course_has_videos, c.unlocks AS course_unlocks
+              c.has_videos AS course_has_videos, c.unlocks AS course_unlocks,
+              c.billing AS course_billing, c.price_label AS course_price_label
        FROM enrollments e JOIN courses_services c ON c.id = e.course_id
        WHERE e.user_id = ? ORDER BY e.created_at ASC`
     )
     .all(userId);
 }
 
+// One enrollment for one course (any status, any expiry) — used by the
+// enroll page (renewal banner) and the success page (expiry line).
+export function getEnrollmentForCourse(userId, courseSlug) {
+  return (
+    getDb()
+      .prepare(
+        `SELECT e.*, c.slug AS course_slug, c.title AS course_title,
+                c.billing AS course_billing
+         FROM enrollments e JOIN courses_services c ON c.id = e.course_id
+         WHERE e.user_id = ? AND c.slug = ?`
+      )
+      .get(userId, courseSlug) || null
+  );
+}
+
+// An enrollment counts as ACTIVE only while its status is 'active' AND
+// its monthly expiry (when set) is still in the future. Every gate in
+// src/lib/access.js and every "already enrolled" check reads through
+// this — a monthly subscription that ran out is treated as NOT enrolled,
+// so the student can renew and the locked pages say so.
 export function hasEnrollment(userId, courseSlug) {
   if (!userId) return false;
   const row = getDb()
     .prepare(
       `SELECT e.id FROM enrollments e
        JOIN courses_services c ON c.id = e.course_id
-       WHERE e.user_id = ? AND c.slug = ? AND e.status = 'active'`
+       WHERE e.user_id = ? AND c.slug = ? AND e.status = 'active'
+         AND (e.expires_at IS NULL OR e.expires_at > datetime('now'))`
     )
     .get(userId, courseSlug);
   return !!row;
+}
+
+// Is one enrollment row (as returned by getEnrollments /
+// getEnrollmentForCourse) currently active? Same rule as
+// hasEnrollment, for rendering (profile, admin) — never a gate on its
+// own. expires_at is stored as UTC "YYYY-MM-DD HH:MM:SS", so parse it
+// as UTC before comparing.
+export function isEnrollmentActive(e) {
+  if (!e || e.status !== "active") return false;
+  if (!e.expires_at) return true;
+  const ms = new Date(String(e.expires_at).replace(" ", "T") + "Z").getTime();
+  return Number.isFinite(ms) && ms > Date.now();
+}
+
+// Expiry timestamp for a fresh monthly payment: now + 30 days, in the
+// same UTC "YYYY-MM-DD HH:MM:SS" shape SQLite datetime('now') uses.
+export function monthlyExpiresAt() {
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+}
+
+// Display price for a course card / enroll page: monthly courses show
+// "$200/month" so the subscription is obvious everywhere the price is.
+export function displayPrice(course) {
+  if (!course) return "";
+  return course.billing === "monthly" ? `${course.price_label}/month` : course.price_label;
 }
 
 // --- Admin helpers (master admin panel only) ---------------------------
@@ -860,7 +949,8 @@ export function getEnrollmentDetail(id) {
   const e = db
     .prepare(
       `SELECT e.*, c.slug AS course_slug, c.title AS course_title,
-              c.has_videos AS course_has_videos, u.name AS user_name, u.email AS user_email
+              c.has_videos AS course_has_videos, c.billing AS course_billing,
+              u.name AS user_name, u.email AS user_email
        FROM enrollments e JOIN courses_services c ON c.id = e.course_id
        JOIN users u ON u.id = e.user_id WHERE e.id = ?`
     )

@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCourseBySlug, hasEnrollment } from "../../../../lib/db.js";
+import { getCourseBySlug, hasEnrollment, getEnrollmentForCourse } from "../../../../lib/db.js";
 import { getSessionUser } from "../../../../lib/auth.js";
 import { isMailConfigured } from "../../../../lib/mail.js";
 
@@ -23,6 +23,14 @@ export default async function EnrollSuccessPage({ params, searchParams }) {
   const user = await getSessionUser();
   if (!user) redirect(`/login?next=/enroll/${slug}`);
   if (!hasEnrollment(user.id, slug)) redirect(`/enroll/${slug}`);
+
+  // Monthly expiry for the confirmation (Nov 2026): the student sees
+  // exactly how long this payment lasts.
+  const enrollment = getEnrollmentForCourse(user.id, slug);
+  const expiresAt = enrollment?.expires_at || null;
+  const expiresLabel = expiresAt
+    ? new Date(String(expiresAt).replace(" ", "T") + "Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : null;
 
   const unlocked = [];
   unlocked.push("Community — Premium Live Trade Everyday");
@@ -43,6 +51,12 @@ export default async function EnrollSuccessPage({ params, searchParams }) {
         <p className="muted">
           You are now enrolled in <strong>{course.title}</strong>.
         </p>
+        {course.billing === "monthly" && expiresLabel ? (
+          <div className="alert alert-info">
+            <strong>Monthly subscription — your access runs until {expiresLabel}.</strong> When it ends, your access
+            stops and you renew by paying again — nothing is ever charged automatically.
+          </div>
+        ) : null}
         <h3>What unlocked for you</h3>
         <ul className="check-list">
           {unlocked.map((u) => (<li key={u}>{u}</li>))}
@@ -71,6 +85,9 @@ export default async function EnrollSuccessPage({ params, searchParams }) {
 
         <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
           <Link href="/community" className="btn btn-amber">Go to Community</Link>
+          {course.unlocks === "live-room" ? (
+            <Link href="/live-room" className="btn btn-dark">Live Room</Link>
+          ) : null}
           {course.has_videos ? (
             <Link href={`/course-videos?course=${course.slug}`} className="btn btn-dark">Course Videos</Link>
           ) : null}

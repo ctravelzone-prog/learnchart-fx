@@ -9,7 +9,7 @@
 // from the page_content table via src/lib/page-content.js (/admin/pages).
 // ---------------------------------------------------------------------------
 import Link from "next/link";
-import { getAllCourses } from "../lib/db.js";
+import { getAllCourses, displayPrice } from "../lib/db.js";
 import { SITE, INSIDE_VIDEO_ID } from "../lib/config.js";
 import {
   getStats,
@@ -211,7 +211,10 @@ export default async function HomePage() {
               <ul className="check-list">
                 {c.features.slice(0, 4).map((f) => (<li key={f}>{f}</li>))}
               </ul>
-              <p className="price">{c.price_label}</p>
+              <p className="price">{displayPrice(c)}</p>
+              {c.billing === "monthly" ? (
+                <p className="small muted" style={{ marginTop: -8 }}>per month · 30 days access</p>
+              ) : null}
               <Link href="/courses" className="btn btn-amber">{c.button_label}</Link>
             </div>
           ))}

@@ -26,7 +26,7 @@ export default async function AdminCourseFormPage({ params, searchParams }) {
   const c = course || {
     slug: "", title: "", subtitle: "", level: "", status: "Available",
     price_label: "", price_cents: 0, button_type: "enroll", button_label: "Enroll Now",
-    features: [], sort_order: 0, has_videos: 0, unlocks: "none", image: "", badge: "",
+    features: [], sort_order: 0, has_videos: 0, unlocks: "none", image: "", badge: "", billing: "one-time",
   };
 
   return (
@@ -117,6 +117,13 @@ export default async function AdminCourseFormPage({ params, searchParams }) {
               <option value="none">None (Community only — every enrollment opens Community)</option>
               <option value="live-room">Live Room</option>
               <option value="consultation">Consultation</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="billing">Billing (how long one payment lasts)</label>
+            <select id="billing" name="billing" defaultValue={c.billing || "one-time"}>
+              <option value="one-time">One-time — pay once, access forever</option>
+              <option value="monthly">Monthly — each payment buys 30 days, then access stops until renewed</option>
             </select>
           </div>
 

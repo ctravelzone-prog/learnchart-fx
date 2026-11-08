@@ -26,7 +26,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import QRCode from "qrcode";
-import { getCourseBySlug, hasEnrollment } from "../../../lib/db.js";
+import { getCourseBySlug, hasEnrollment, getEnrollmentForCourse, isEnrollmentActive, displayPrice } from "../../../lib/db.js";
 import { getSessionUser } from "../../../lib/auth.js";
 import {
   getBep20Config,
@@ -49,6 +49,16 @@ export default async function EnrollPage({ params, searchParams }) {
   const user = await getSessionUser();
   if (!user) redirect(`/login?next=/enroll/${slug}`);
   if (hasEnrollment(user.id, slug)) redirect(`/enroll/${slug}/success`);
+
+  // RENEWAL (Nov 2026): the student HAD this course but its monthly
+  // subscription ran out — the page says so plainly and offers the
+  // same payment again (the payment extends the same enrollment row).
+  const prior = getEnrollmentForCourse(user.id, slug);
+  const expiredOn =
+    prior && prior.status === "active" && prior.expires_at && !isEnrollmentActive(prior)
+      ? new Date(String(prior.expires_at).replace(" ", "T") + "Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : null;
+  const isMonthly = course.billing === "monthly";
 
   const isPaid = course.price_cents > 0;
   // What a paid buyer is promised once payment verifies. Video courses
@@ -118,12 +128,19 @@ export default async function EnrollPage({ params, searchParams }) {
     <div className="wrap section">
       <div className="card form-card">
         <p className="muted small">ENROLLMENT</p>
-        <h1>{course.title}</h1>
+        <h1>{expiredOn ? `Renew — ${course.title}` : course.title}</h1>
         <p className="muted">{course.subtitle}</p>
+        {expiredOn ? (
+          <div className="alert alert-error">
+            Your subscription expired on <strong>{expiredOn}</strong> and your access stopped. Renew now to get it
+            back — same price, another 30 days.
+          </div>
+        ) : null}
         <dl className="kv">
           <dt>Level</dt><dd>{course.level}</dd>
           <dt>Status</dt><dd>{course.status}</dd>
-          <dt>Price</dt><dd><strong className="amber">{course.price_label}</strong></dd>
+          <dt>Price</dt><dd><strong className="amber">{displayPrice(course)}</strong></dd>
+          {isMonthly ? <><dt>Billing</dt><dd>Monthly subscription — 30 days of access per payment</dd></> : null}
         </dl>
         <ul className="check-list">
           {course.features.map((f) => (<li key={f}>{f}</li>))}
@@ -136,10 +153,16 @@ export default async function EnrollPage({ params, searchParams }) {
             <div className="alert alert-info">
               This service is free — enrollment completes on confirmation.
             </div>
+            {isMonthly ? (
+              <p className="muted">
+                Monthly subscription: each enrollment gives you 30 days of access. When it ends, access stops and
+                you renew by enrolling again here — nothing is ever charged automatically.
+              </p>
+            ) : null}
             <form action="/api/enroll" method="post">
               <input type="hidden" name="slug" value={slug} />
               <button type="submit" className="btn btn-amber" style={{ width: "100%" }}>
-                Confirm Enrollment — {course.price_label}
+                {expiredOn ? "Renew" : "Confirm Enrollment"} — {displayPrice(course)}
               </button>
             </form>
           </>
@@ -151,6 +174,13 @@ export default async function EnrollPage({ params, searchParams }) {
               payment automatically — once it matches, {afterPayment}. Nobody checks payments by hand, so keep
               your transaction ID safe.
             </p>
+            {isMonthly ? (
+              <div className="alert alert-info">
+                <strong>Monthly subscription — {displayPrice(course)}.</strong> Each payment gives you 30 days of
+                access from the moment it verifies. When the 30 days end, your access stops and you renew by
+                paying again here — nothing is ever charged automatically.
+              </div>
+            ) : null}
 
             {/* Payment methods, rendered from the `methods` list above. */}
             {methods.map((m) => (

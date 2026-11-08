@@ -6,19 +6,28 @@
 // /admin). Enrolled state is read from the session on the server.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
-import { getAllCourses, getEnrollments, getLessons } from "../../lib/db.js";
+import { getAllCourses, getEnrollments, getLessons, displayPrice, isEnrollmentActive } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import { PAYMENT_METHOD } from "../../lib/config.js";
 
 export const metadata = {
   title: "Courses & Services — LearnChart FX",
   description:
-    "Forex Trading Premium Course ($250), Private Live Trade ($200) and Trading Consultation (Free) — LearnChart FX.",
+    "Forex Trading Premium Course ($250), Private Live Trade ($200/month) and Trading Consultation (Free) — LearnChart FX.",
 };
 
-function EnrollButton({ course, enrolled }) {
+function EnrollButton({ course, enrolled, expired }) {
   if (enrolled) {
     return <span className="btn btn-green">✓ ENROLLED</span>;
+  }
+  // Monthly subscription ran out: offer Renew (same price, another
+  // 30 days) instead of the plain Enroll button.
+  if (expired) {
+    return (
+      <Link href={`/enroll/${course.slug}`} className="btn btn-amber">
+        Renew — {displayPrice(course)}
+      </Link>
+    );
   }
   if (course.button_type === "coming_soon") {
     return <button type="button" className="btn btn-dark" disabled>Coming Soon</button>;
@@ -34,7 +43,17 @@ export default async function CoursesPage() {
   const courses = getAllCourses();
   const user = await getSessionUser();
   const myEnrollments = user ? getEnrollments(user.id) : [];
-  const enrolledSlugs = new Set(myEnrollments.map((e) => e.course_slug));
+  // slug -> enrollment row. "Enrolled" means ACTIVE (unexpired) only:
+  // a monthly subscription that ran out shows Renew, not ✓ ENROLLED.
+  const enrollmentBySlug = new Map(myEnrollments.map((e) => [e.course_slug, e]));
+  const isActive = (slug) => {
+    const e = enrollmentBySlug.get(slug);
+    return e ? isEnrollmentActive(e) : false;
+  };
+  const isExpired = (slug) => {
+    const e = enrollmentBySlug.get(slug);
+    return Boolean(e && e.status === "active" && e.expires_at && !isEnrollmentActive(e));
+  };
   // Lesson counts for video courses (shown on the Watch link).
   const lessonCounts = {};
   for (const c of courses) {
@@ -67,9 +86,12 @@ export default async function CoursesPage() {
             <ul className="check-list">
               {c.features.map((f) => (<li key={f}>{f}</li>))}
             </ul>
-            <p className="price">{c.price_label}</p>
-            <EnrollButton course={c} enrolled={enrolledSlugs.has(c.slug)} />
-            {c.has_videos && enrolledSlugs.has(c.slug) ? (
+            <p className="price">{displayPrice(c)}</p>
+            {c.billing === "monthly" ? (
+              <p className="small muted" style={{ marginTop: -8 }}>per month · 30 days access · renew manually</p>
+            ) : null}
+            <EnrollButton course={c} enrolled={isActive(c.slug)} expired={isExpired(c.slug)} />
+            {c.has_videos && isActive(c.slug) ? (
               <div style={{ marginTop: 12 }}>
                 <Link href={`/course-videos?course=${c.slug}`} className="btn btn-dark btn-sm">
                   ▶ Watch Course Videos — {lessonCounts[c.slug] || ""} lessons, unlock with your key 🔑

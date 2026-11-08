@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "../../../../lib/admin.js";
-import { getEnrollmentDetail } from "../../../../lib/db.js";
+import { getEnrollmentDetail, isEnrollmentActive } from "../../../../lib/db.js";
 import { decryptKey } from "../../../../lib/keys.js";
 
 export const metadata = { title: "Enrollment — Admin — LearnChart FX" };
@@ -19,6 +19,14 @@ export default async function AdminEnrollmentDetailPage({ searchParams, params }
   const sp = await searchParams;
   const detail = getEnrollmentDetail(Number(id));
   if (!detail) notFound();
+
+  // Monthly expiry governs access: an 'active' row whose 30 days ran
+  // out is Expired here, even though its status column still says
+  // active. The student renews by paying again; the admin status
+  // toggle below does not extend an expiry.
+  const expired = detail.status === "active" && detail.expires_at && !isEnrollmentActive(detail);
+  const fmtDate = (s) =>
+    new Date(String(s).replace(" ", "T") + "Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   // The key is decrypted server-side ONLY for this admin detail view.
   let plainKey = null;
@@ -46,8 +54,18 @@ export default async function AdminEnrollmentDetailPage({ searchParams, params }
           <h3>Enrollment</h3>
           <dl className="kv">
             <dt>Status</dt>
-            <dd>{detail.status === "active" ? <span className="badge badge-green">Active</span> : <span className="badge badge-amber">{detail.status}</span>}</dd>
+            <dd>
+              {expired ? (
+                <span className="badge" style={{ background: "#fde8e8", color: "#b42318" }}>Expired</span>
+              ) : detail.status === "active" ? (
+                <span className="badge badge-green">Active</span>
+              ) : (
+                <span className="badge badge-amber">{detail.status}</span>
+              )}
+            </dd>
+            <dt>Billing</dt><dd>{detail.course_billing === "monthly" ? "Monthly — $200/month, 30 days per payment" : "One-time — no expiry"}</dd>
             <dt>Enrolled</dt><dd>{new Date(detail.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</dd>
+            <dt>Expires</dt><dd>{detail.expires_at ? fmtDate(detail.expires_at) : "— (never expires)"}</dd>
             <dt>Payment</dt><dd>{detail.payment_status || "—"}</dd>
           </dl>
           <form action="/api/admin/enrollments/status" method="post" style={{ marginTop: 12 }}>

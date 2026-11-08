@@ -27,11 +27,20 @@ export const SLUGS = {
   CONSULT: "trading-consultation",
 };
 
+// MONTHLY EXPIRY (Nov 2026): an enrollment counts only while it is
+// unexpired. expires_at is NULL for one-time courses (never expires);
+// a monthly enrollment (Private Live Trade) is live only while
+// expires_at is in the future. Every gate below carries this fragment,
+// so an expired subscription loses Community, Live Room, Consultation
+// and Course Videos access at the same moment — the student is told to
+// renew instead of seeing a generic lock.
+const NOT_EXPIRED = "AND (e.expires_at IS NULL OR e.expires_at > datetime('now'))";
+
 // Community: ANY enrollment unlocks it (any one course or service).
 export function canEnterCommunity(userId) {
   if (!userId) return false;
   const row = getDb()
-    .prepare("SELECT id FROM enrollments WHERE user_id = ? AND status = 'active' LIMIT 1")
+    .prepare(`SELECT id FROM enrollments e WHERE user_id = ? AND status = 'active' ${NOT_EXPIRED} LIMIT 1`)
     .get(userId);
   return !!row;
 }
@@ -45,10 +54,41 @@ export function canEnterLiveRoom(userId) {
     .prepare(
       `SELECT e.id FROM enrollments e
        JOIN courses_services c ON c.id = e.course_id
-       WHERE e.user_id = ? AND e.status = 'active' AND c.unlocks = 'live-room' LIMIT 1`
+       WHERE e.user_id = ? AND e.status = 'active' AND c.unlocks = 'live-room' ${NOT_EXPIRED} LIMIT 1`
     )
     .get(userId);
   return !!row;
+}
+
+// Live Room access state, for the locked preview: 'open' (active
+// enrollment — expiresAt is the monthly expiry when set), 'expired'
+// (the student HAD a live-room enrollment but its monthly subscription
+// ran out — the page says so and offers Renew), or 'none' (never
+// enrolled — the generic lock). A cancelled enrollment is 'none', not
+// 'expired': only a lapsed paid subscription gets the Renew message.
+export function getLiveRoomAccessState(userId) {
+  if (!userId) return { state: "none" };
+  const open = getDb()
+    .prepare(
+      `SELECT e.expires_at FROM enrollments e
+       JOIN courses_services c ON c.id = e.course_id
+       WHERE e.user_id = ? AND e.status = 'active' AND c.unlocks = 'live-room' ${NOT_EXPIRED} LIMIT 1`
+    )
+    .get(userId);
+  if (open) return { state: "open", expiresAt: open.expires_at || null };
+  const expired = getDb()
+    .prepare(
+      `SELECT e.expires_at, c.slug AS course_slug, c.title AS course_title FROM enrollments e
+       JOIN courses_services c ON c.id = e.course_id
+       WHERE e.user_id = ? AND e.status = 'active' AND c.unlocks = 'live-room'
+         AND e.expires_at IS NOT NULL AND e.expires_at <= datetime('now')
+       ORDER BY e.expires_at DESC LIMIT 1`
+    )
+    .get(userId);
+  if (expired) {
+    return { state: "expired", expiredAt: expired.expires_at, courseSlug: expired.course_slug, courseTitle: expired.course_title };
+  }
+  return { state: "none" };
 }
 
 // Consultation: ANY enrollment whose course unlocks it (unlocks =
@@ -59,7 +99,7 @@ export function canEnterConsultation(userId) {
     .prepare(
       `SELECT e.id FROM enrollments e
        JOIN courses_services c ON c.id = e.course_id
-       WHERE e.user_id = ? AND e.status = 'active' AND c.unlocks = 'consultation' LIMIT 1`
+       WHERE e.user_id = ? AND e.status = 'active' AND c.unlocks = 'consultation' ${NOT_EXPIRED} LIMIT 1`
     )
     .get(userId);
   return !!row;
@@ -73,7 +113,7 @@ export function getVideoEnrollments(userId) {
     .prepare(
       `SELECT e.*, c.slug AS course_slug, c.title AS course_title
        FROM enrollments e JOIN courses_services c ON c.id = e.course_id
-       WHERE e.user_id = ? AND e.status = 'active' AND c.has_videos = 1
+       WHERE e.user_id = ? AND e.status = 'active' AND c.has_videos = 1 ${NOT_EXPIRED}
        ORDER BY c.sort_order ASC`
     )
     .all(userId);
@@ -87,7 +127,7 @@ export function getVideoEnrollment(userId, courseSlug) {
       .prepare(
         `SELECT e.*, c.slug AS course_slug, c.title AS course_title
          FROM enrollments e JOIN courses_services c ON c.id = e.course_id
-         WHERE e.user_id = ? AND c.slug = ? AND e.status = 'active' AND c.has_videos = 1`
+         WHERE e.user_id = ? AND c.slug = ? AND e.status = 'active' AND c.has_videos = 1 ${NOT_EXPIRED}`
       )
       .get(userId, courseSlug) || null
   );
@@ -122,7 +162,7 @@ export function consumeKeyVisit(userId, token) {
     .prepare(
       `SELECT e.*, c.slug AS course_slug, c.title AS course_title
        FROM enrollments e JOIN courses_services c ON c.id = e.course_id
-       WHERE e.id = ? AND e.user_id = ? AND e.status = 'active' AND c.has_videos = 1`
+       WHERE e.id = ? AND e.user_id = ? AND e.status = 'active' AND c.has_videos = 1 ${NOT_EXPIRED}`
     )
     .get(row.enrollment_id, userId);
   if (!enrollment) return null;
@@ -136,7 +176,7 @@ export function consumeKeyVisit(userId, token) {
 export function createKeyVisit(userId, enrollmentId) {
   if (!userId || !enrollmentId) return null;
   const enrollment = getDb()
-    .prepare("SELECT id FROM enrollments WHERE id = ? AND user_id = ? AND status = 'active'")
+    .prepare("SELECT id FROM enrollments WHERE id = ? AND user_id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > datetime('now'))")
     .get(enrollmentId, userId);
   if (!enrollment) return null;
   const token = generateVisitToken();

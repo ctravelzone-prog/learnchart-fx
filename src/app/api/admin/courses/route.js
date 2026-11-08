@@ -3,9 +3,10 @@
 // (admin only). The form fields are the whole course record: title,
 // slug, subtitle, level, status, price label + cents, button type +
 // label, features (one per line), sort order, has_videos, unlocks,
-// badge, and an optional card image upload. A new course appears on
-// /courses and in the student's dashboard with zero code changes —
-// the gates read the has_videos / unlocks flags, not the slug.
+// billing (one-time / monthly), badge, and an optional card image
+// upload. A new course appears on /courses and in the student's
+// dashboard with zero code changes — the gates read the has_videos /
+// unlocks / billing flags, not the slug.
 // Deleting a course refuses while enrollments exist (the admin must
 // cancel those first); lessons of a deleted course go with it.
 // ---------------------------------------------------------------------------
@@ -72,6 +73,9 @@ export async function POST(request) {
   const unlocks = ["none", "live-room", "consultation"].includes(String(form.get("unlocks")))
     ? String(form.get("unlocks"))
     : "none";
+  // Billing model (Nov 2026): 'one-time' = pay once, access forever;
+  // 'monthly' = each payment buys 30 days (Private Live Trade).
+  const billing = String(form.get("billing")) === "monthly" ? "monthly" : "one-time";
   const badge = String(form.get("badge") || "").trim();
 
   if (!title || !slug) {
@@ -101,22 +105,22 @@ export async function POST(request) {
     db.prepare(
       `UPDATE courses_services SET slug = ?, title = ?, subtitle = ?, level = ?, status = ?,
        price_label = ?, price_cents = ?, button_type = ?, button_label = ?, features_json = ?,
-       sort_order = ?, has_videos = ?, unlocks = ?, image = ?, badge = ? WHERE id = ?`
+       sort_order = ?, has_videos = ?, unlocks = ?, image = ?, badge = ?, billing = ? WHERE id = ?`
     ).run(
       slug, title, subtitle, level, status, priceLabelFinal, priceCents, buttonType, buttonLabel,
-      JSON.stringify(features), sortOrder, hasVideos, unlocks, image, badge, id
+      JSON.stringify(features), sortOrder, hasVideos, unlocks, image, badge, billing, id
     );
     return redirectTo(`/admin/courses/${id}?saved=1`);
   }
   const newId = db
     .prepare(
       `INSERT INTO courses_services (slug, title, subtitle, level, status, price_label, price_cents,
-       button_type, button_label, features_json, sort_order, has_videos, unlocks, image, badge)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       button_type, button_label, features_json, sort_order, has_videos, unlocks, image, badge, billing)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       slug, title, subtitle, level, status, priceLabelFinal, priceCents, buttonType, buttonLabel,
-      JSON.stringify(features), sortOrder, hasVideos, unlocks, image, badge
+      JSON.stringify(features), sortOrder, hasVideos, unlocks, image, badge, billing
     ).lastInsertRowid;
   return redirectTo(`/admin/courses/${newId}?saved=1`);
 }

@@ -16,7 +16,7 @@
 // has_videos works with zero code changes.
 // ---------------------------------------------------------------------------
 import { redirectTo } from "../../../lib/http.js";
-import { getDb, getCourseBySlug, hasEnrollment } from "../../../lib/db.js";
+import { getDb, getCourseBySlug, hasEnrollment, getEnrollmentForCourse, monthlyExpiresAt } from "../../../lib/db.js";
 import { getSessionUser } from "../../../lib/auth.js";
 import { generateCourseKey, hashKey, encryptKey } from "../../../lib/keys.js";
 import { sendCourseKeyEmail, isMailConfigured } from "../../../lib/mail.js";
@@ -47,9 +47,22 @@ export async function POST(request) {
   }
 
   const db = getDb();
-  const enrollmentId = db
-    .prepare("INSERT INTO enrollments (user_id, course_id, status, payment_status) VALUES (?, ?, 'active', ?)")
-    .run(user.id, course.id, "free — enrolled on confirmation").lastInsertRowid;
+  // MONTHLY RENEWAL (Nov 2026): one row per user + course. A lapsed
+  // monthly enrollment keeps its row, so re-enrolling EXTENDS it
+  // (status back to active, expires_at = now + 30 days) instead of
+  // failing on the UNIQUE constraint. One-time courses stay NULL.
+  const expiresAt = course.billing === "monthly" ? monthlyExpiresAt() : null;
+  const existing = getEnrollmentForCourse(user.id, slug);
+  let enrollmentId;
+  if (existing) {
+    db.prepare("UPDATE enrollments SET status = 'active', payment_status = ?, expires_at = ? WHERE id = ?")
+      .run("free — enrolled on confirmation", expiresAt, existing.id);
+    enrollmentId = existing.id;
+  } else {
+    enrollmentId = db
+      .prepare("INSERT INTO enrollments (user_id, course_id, status, payment_status, expires_at) VALUES (?, ?, 'active', ?, ?)")
+      .run(user.id, course.id, "free — enrolled on confirmation", expiresAt).lastInsertRowid;
+  }
 
   // Video course (has_videos): one unique Course Key for THIS student +
   // enrollment. The plain key exists only here, in this request — it is
@@ -59,13 +72,18 @@ export async function POST(request) {
   let keymail = null;
   if (course.has_videos) {
     const key = generateCourseKey();
-    db.prepare("INSERT INTO course_keys (enrollment_id, key_hash, key_encrypted) VALUES (?, ?, ?)")
+    // INSERT OR IGNORE: a renewal keeps the key it already has — and
+    // in that case no new key is emailed (see payments.js).
+    const inserted = db
+      .prepare("INSERT OR IGNORE INTO course_keys (enrollment_id, key_hash, key_encrypted) VALUES (?, ?, ?)")
       .run(enrollmentId, hashKey(key), encryptKey(key));
-    if (!isMailConfigured()) {
-      keymail = "unconfigured";
-    } else {
-      const result = await sendCourseKeyEmail({ to: user.email, name: user.name, key });
-      keymail = result.sent ? "sent" : "failed";
+    if (inserted.changes > 0) {
+      if (!isMailConfigured()) {
+        keymail = "unconfigured";
+      } else {
+        const result = await sendCourseKeyEmail({ to: user.email, name: user.name, key });
+        keymail = result.sent ? "sent" : "failed";
+      }
     }
   }
 

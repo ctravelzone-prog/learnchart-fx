@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getSessionUser } from "../../lib/auth.js";
-import { canEnterLiveRoom } from "../../lib/access.js";
+import { getLiveRoomAccessState } from "../../lib/access.js";
 import { LIVE_STREAM_PROVIDER } from "../../lib/config.js";
 import { getSingleSetting } from "../../lib/settings.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
@@ -19,8 +19,33 @@ export const metadata = {
 
 export default async function LiveRoomPage() {
   const user = await getSessionUser();
+  const access = getLiveRoomAccessState(user?.id);
 
-  if (!user || !canEnterLiveRoom(user.id)) {
+  if (access.state === "expired") {
+    // MONTHLY SUBSCRIPTION LAPSED (Nov 2026): the student HAD Private
+    // Live Trade, but the 30 days ran out. Say so with the exact date
+    // and offer Renew — not the generic "you never enrolled" lock.
+    const expiredOn = new Date(String(access.expiredAt).replace(" ", "T") + "Z").toLocaleDateString("en-GB", {
+      day: "numeric", month: "short", year: "numeric",
+    });
+    return (
+      <div className="wrap section">
+        <p className="muted small">HOME › LIVE ROOM</p>
+        <h1 style={{ fontSize: 36 }}>Live <span className="amber">Room</span></h1>
+        <LockedPreview
+          title="⏰ Your Private Live Trade subscription expired"
+          text={`Your Private Live Trade subscription expired on ${expiredOn} and your Live Room access stopped. Renew to get back in — each payment gives you another 30 days.`}
+          unlocks="Renewal is manual: pay again below. Nothing is ever charged automatically."
+          buttons={[
+            { href: `/enroll/${access.courseSlug || "private-live-trade"}`, label: "Renew Private Live Trade — $200/month", style: "btn-amber" },
+            { href: "/courses", label: "See All Programs", style: "btn-dark" },
+          ]}
+        />
+      </div>
+    );
+  }
+
+  if (access.state !== "open") {
     return (
       <div className="wrap section">
         <p className="muted small">HOME › LIVE ROOM</p>
@@ -30,7 +55,7 @@ export default async function LiveRoomPage() {
           text="The Live Room is part of Private Live Trade. You can only join it after you purchase / enroll in Private Live Trade."
           unlocks="⚠️ Buying only the Forex Trading Premium Course does not unlock the Live Room."
           buttons={[
-            { href: "/enroll/private-live-trade", label: "Enroll in Private Live Trade — $200", style: "btn-amber" },
+            { href: "/enroll/private-live-trade", label: "Enroll in Private Live Trade — $200/month", style: "btn-amber" },
             { href: "/courses", label: "See All Programs", style: "btn-dark" },
           ]}
         />
@@ -46,6 +71,13 @@ export default async function LiveRoomPage() {
         Watch Siam Chowdhury and Rex Mizan analyse and trade the live market — entries, stop loss and targets explained as they happen.
       </p>
       <p><span className="badge badge-green">🔓 Live Room unlocked</span> <span className="muted small">Your Private Live Trade enrollment gives you full access to every live session below.</span></p>
+      {access.expiresAt ? (
+        <p className="small muted">
+          Monthly subscription — your access runs until{" "}
+          <strong>{new Date(String(access.expiresAt).replace(" ", "T") + "Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</strong>.
+          {" "}<Link href="/enroll/private-live-trade" className="amber">Renew →</Link>
+        </p>
+      ) : null}
 
       <div className="card">
         <div className="stage-img">

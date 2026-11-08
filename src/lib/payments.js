@@ -32,7 +32,7 @@
 // the existing mailer (src/lib/mail.js).
 // ---------------------------------------------------------------------------
 import crypto from "node:crypto";
-import { getDb, hasEnrollment } from "./db.js";
+import { getDb, hasEnrollment, monthlyExpiresAt } from "./db.js";
 import { generateCourseKey, hashKey, encryptKey } from "./keys.js";
 import { sendCourseKeyEmail, isMailConfigured } from "./mail.js";
 import { getBep20Settings, getBinancePaySettings, getMerchantSettings, getUsdtAmount } from "./settings.js";
@@ -318,24 +318,49 @@ export async function completePaidEnrollment({ userId, course, method, txRef, am
   }
 
   const paymentStatus = `paid — ${method} ${amount} ${currency}`;
-  const enrollmentId = db
-    .prepare("INSERT INTO enrollments (user_id, course_id, status, payment_status) VALUES (?, ?, 'active', ?)")
-    .run(userId, course.id, paymentStatus).lastInsertRowid;
+  // MONTHLY RENEWAL (Nov 2026): one enrollment row per user + course
+  // (UNIQUE constraint). A monthly course that lapsed keeps its row, so
+  // a renewal payment EXTENDS that row: status back to active and
+  // expires_at = this payment + 30 days. A fresh enrollment is
+  // inserted the same way, with expires_at set only for monthly
+  // courses (one-time courses stay NULL = never expires).
+  const expiresAt = course.billing === "monthly" ? monthlyExpiresAt() : null;
+  const existing = db
+    .prepare("SELECT id FROM enrollments WHERE user_id = ? AND course_id = ?")
+    .get(userId, course.id);
+  let enrollmentId;
+  if (existing) {
+    db.prepare(
+      "UPDATE enrollments SET status = 'active', payment_status = ?, expires_at = ? WHERE id = ?"
+    ).run(paymentStatus, expiresAt, existing.id);
+    enrollmentId = existing.id;
+  } else {
+    enrollmentId = db
+      .prepare("INSERT INTO enrollments (user_id, course_id, status, payment_status, expires_at) VALUES (?, ?, 'active', ?, ?)")
+      .run(userId, course.id, paymentStatus, expiresAt).lastInsertRowid;
+  }
 
   // Video course (has_videos): one unique Course Key, emailed to the
   // student's Gmail (same rule as free enroll — the key is never shown
   // on the site). Works for ANY video course, not just Forex.
+  // INSERT OR IGNORE: a renewal of a video course keeps the key it
+  // already has instead of failing on the one-key-per-enrollment rule
+  // — and in that case NO new key is emailed (the original key still
+  // stands; emailing the fresh, un-stored key would be wrong).
   let keymail = null;
   if (course.has_videos) {
     const key = generateCourseKey();
-    db.prepare("INSERT INTO course_keys (enrollment_id, key_hash, key_encrypted) VALUES (?, ?, ?)")
+    const inserted = db
+      .prepare("INSERT OR IGNORE INTO course_keys (enrollment_id, key_hash, key_encrypted) VALUES (?, ?, ?)")
       .run(enrollmentId, hashKey(key), encryptKey(key));
-    const user = db.prepare("SELECT name, email FROM users WHERE id = ?").get(userId);
-    if (!isMailConfigured()) {
-      keymail = "unconfigured";
-    } else {
-      const result = await sendCourseKeyEmail({ to: user.email, name: user.name, key });
-      keymail = result.sent ? "sent" : "failed";
+    if (inserted.changes > 0) {
+      const user = db.prepare("SELECT name, email FROM users WHERE id = ?").get(userId);
+      if (!isMailConfigured()) {
+        keymail = "unconfigured";
+      } else {
+        const result = await sendCourseKeyEmail({ to: user.email, name: user.name, key });
+        keymail = result.sent ? "sent" : "failed";
+      }
     }
   }
   return { ok: true, keymail };
