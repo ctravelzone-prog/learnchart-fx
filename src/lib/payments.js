@@ -35,6 +35,7 @@ import crypto from "node:crypto";
 import { getDb, hasEnrollment } from "./db.js";
 import { generateCourseKey, hashKey, encryptKey } from "./keys.js";
 import { sendCourseKeyEmail, isMailConfigured } from "./mail.js";
+import { getBep20Settings, getBinancePaySettings, getMerchantSettings, getUsdtAmount } from "./settings.js";
 
 // --- Fixed facts -----------------------------------------------------------
 // USDT on BNB Smart Chain (BEP20): 18 decimals. The contract address is
@@ -54,38 +55,44 @@ export function coursePriceUsdt(course) {
   return Number(course.price_cents) / 100;
 }
 
-// --- Merchant configuration (env only, read at call time) ------------------
+// --- Merchant configuration (DB-first, env fallback) ------------------
 // Nothing is invented here: an empty value means "not connected yet"
 // and the pages say so honestly instead of showing a fake address/key.
+// The owner fills these in from the admin panel (Payment Settings) —
+// no env vars or code changes needed. Env vars still work as a fallback
+// (and survive a DB wipe). All reads go through src/lib/settings.js,
+// which also handles the per-method enable/disable toggles and the
+// encrypted storage of secrets. See that file for the rules.
 export function getBep20Config() {
-  return {
-    address: (process.env.BINANCE_BSC_ADDRESS || "").trim(),
-    bscscanKey: (process.env.BSCSCAN_API_KEY || "").trim(),
-  };
+  const s = getBep20Settings();
+  return { address: s.address, bscscanKey: s.bscscanKey, enabled: s.enabled };
 }
 export function isBep20Configured() {
-  return Boolean(getBep20Config().address);
+  const s = getBep20Settings();
+  return Boolean(s.enabled && s.address);
 }
 export function getBinancePayTxConfig() {
-  return {
-    payId: (process.env.BINANCE_PAY_ID || "").trim(),
-    apiKey: (process.env.BINANCE_API_KEY || "").trim(),
-    apiSecret: (process.env.BINANCE_API_SECRET || "").trim(),
-  };
+  const s = getBinancePaySettings();
+  return { payId: s.payId, apiKey: s.apiKey, apiSecret: s.apiSecret, enabled: s.enabled };
 }
 export function isBinancePayTxConfigured() {
-  const c = getBinancePayTxConfig();
-  return Boolean(c.payId && c.apiKey && c.apiSecret);
+  const s = getBinancePaySettings();
+  return Boolean(s.enabled && s.payId && s.apiKey && s.apiSecret);
 }
 export function getBinancePayMerchantConfig() {
-  return {
-    apiKey: (process.env.BINANCE_PAY_API_KEY || "").trim(),
-    apiSecret: (process.env.BINANCE_PAY_SECRET_KEY || "").trim(),
-  };
+  const s = getMerchantSettings();
+  return { apiKey: s.apiKey, apiSecret: s.apiSecret, enabled: s.enabled };
 }
 export function isBinancePayMerchantConfigured() {
-  const c = getBinancePayMerchantConfig();
-  return Boolean(c.apiKey && c.apiSecret);
+  const s = getMerchantSettings();
+  return Boolean(s.enabled && s.apiKey && s.apiSecret);
+}
+
+// The USDT amount a student must send: the admin-set amount wins when
+// present, otherwise the course price. Every verify path and the enroll
+// page use this one function, so the amount can never drift apart.
+export function getPayableAmountUsdt(course) {
+  return getUsdtAmount(coursePriceUsdt(course));
 }
 
 // --- Small helpers ---------------------------------------------------------
@@ -315,10 +322,11 @@ export async function completePaidEnrollment({ userId, course, method, txRef, am
     .prepare("INSERT INTO enrollments (user_id, course_id, status, payment_status) VALUES (?, ?, 'active', ?)")
     .run(userId, course.id, paymentStatus).lastInsertRowid;
 
-  // Forex course: one unique Course Key, emailed to the student's Gmail
-  // (same rule as free enroll — the key is never shown on the site).
+  // Video course (has_videos): one unique Course Key, emailed to the
+  // student's Gmail (same rule as free enroll — the key is never shown
+  // on the site). Works for ANY video course, not just Forex.
   let keymail = null;
-  if (slug === "forex-premium-course") {
+  if (course.has_videos) {
     const key = generateCourseKey();
     db.prepare("INSERT INTO course_keys (enrollment_id, key_hash, key_encrypted) VALUES (?, ?, ?)")
       .run(enrollmentId, hashKey(key), encryptKey(key));
@@ -375,7 +383,7 @@ export async function createBinancePayOrder({ userId, course, webhookUrl, return
   const body = {
     env: { terminalType: "WEB" },
     merchantTradeNo,
-    orderAmount: coursePriceUsdt(course),
+    orderAmount: getPayableAmountUsdt(course),
     currency: "USDT",
     goods: {
       goodsType: "02",
@@ -404,7 +412,7 @@ export async function createBinancePayOrder({ userId, course, webhookUrl, return
     .prepare(
       "INSERT INTO binance_pay_orders (merchant_trade_no, user_id, course_slug, amount, currency, status) VALUES (?, ?, ?, ?, 'USDT', 'created')"
     )
-    .run(merchantTradeNo, userId, course.slug, String(coursePriceUsdt(course)));
+    .run(merchantTradeNo, userId, course.slug, String(getPayableAmountUsdt(course)));
   return { ok: true, merchantTradeNo, checkoutUrl: json.data.checkoutUrl };
 }
 

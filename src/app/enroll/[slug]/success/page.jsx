@@ -26,14 +26,14 @@ export default async function EnrollSuccessPage({ params, searchParams }) {
 
   const unlocked = [];
   unlocked.push("Community — Premium Live Trade Everyday");
-  if (slug === "premium-live-trade-support") unlocked.push("Live Room");
-  if (slug === "trading-consultation") unlocked.push("Trading Consultation area");
-  if (slug === "forex-premium-course") unlocked.push("Course Videos (after you enter your Course Key — emailed to your Gmail)");
+  if (course.unlocks === "live-room") unlocked.push("Live Room");
+  if (course.unlocks === "consultation") unlocked.push("Trading Consultation area");
+  if (course.has_videos) unlocked.push("Course Videos (after you enter your Course Key — emailed to your Gmail)");
 
   // How the key email went (set by /api/enroll; absent on a direct visit).
   // "sent" = emailed. "failed" = SMTP tried and failed. "unconfigured" =
   // no email service connected yet. No param = fall back to config state.
-  const keymail = sp?.keymail || (slug === "forex-premium-course" ? (isMailConfigured() ? "sent" : "unconfigured") : null);
+  const keymail = sp?.keymail || (course.has_videos ? (isMailConfigured() ? "sent" : "unconfigured") : null);
 
   return (
     <div className="wrap section">
@@ -48,20 +48,20 @@ export default async function EnrollSuccessPage({ params, searchParams }) {
           {unlocked.map((u) => (<li key={u}>{u}</li>))}
         </ul>
 
-        {slug === "forex-premium-course" && keymail === "sent" ? (
+        {course.has_videos && keymail === "sent" ? (
           <div className="alert alert-ok">
             <strong>Your Course Key was emailed to {user.email}.</strong> Check your Gmail inbox (and Spam folder)
-            — enter that key on the Course Videos page to watch all 10 lessons. You will be asked for the key every
+            — enter that key on the Course Videos page to watch the lessons. You will be asked for the key every
             time you open the page, so keep the email safe. Every student&apos;s key is different. Never share it.
           </div>
         ) : null}
-        {slug === "forex-premium-course" && keymail === "failed" ? (
+        {course.has_videos && keymail === "failed" ? (
           <div className="alert alert-error">
             <strong>We could not send your Course Key email right now.</strong> Your enrollment is complete — use
             &ldquo;Resend my key&rdquo; on your profile to have the key emailed to {user.email} again.
           </div>
         ) : null}
-        {slug === "forex-premium-course" && keymail === "unconfigured" ? (
+        {course.has_videos && keymail === "unconfigured" ? (
           <div className="alert alert-info">
             <strong>Email service is not connected yet.</strong> Your Course Key will be emailed to {user.email} once
             the site owner connects email. Your enrollment is complete — the Course Videos page will stay locked until
@@ -71,8 +71,8 @@ export default async function EnrollSuccessPage({ params, searchParams }) {
 
         <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
           <Link href="/community" className="btn btn-amber">Go to Community</Link>
-          {slug === "forex-premium-course" ? (
-            <Link href="/course-videos" className="btn btn-dark">Course Videos</Link>
+          {course.has_videos ? (
+            <Link href={`/course-videos?course=${course.slug}`} className="btn btn-dark">Course Videos</Link>
           ) : null}
           <Link href="/profile" className="btn btn-dark">My Profile</Link>
         </div>

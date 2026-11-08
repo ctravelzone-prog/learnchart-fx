@@ -8,6 +8,7 @@ import Link from "next/link";
 import { getSessionUser } from "../../lib/auth.js";
 import { canEnterLiveRoom } from "../../lib/access.js";
 import { LIVE_STREAM_PROVIDER } from "../../lib/config.js";
+import { getSingleSetting } from "../../lib/settings.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
 
 export const metadata = {
@@ -60,7 +61,7 @@ export default async function LiveRoomPage() {
         <h2 style={{ marginTop: 16 }}>Premium Live Trade — Daily Sessions</h2>
         <p className="muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</p>
         <div className="alert alert-info">
-          Live stream provider: <strong>{LIVE_STREAM_PROVIDER}</strong> — the live player will appear here once Siam confirms the streaming provider.
+          Live stream provider: <strong>{getSingleSetting("live_stream_provider", LIVE_STREAM_PROVIDER)}</strong> — the live player will appear here once Siam confirms the streaming provider.
         </div>
         <p>✅ You are in the live room. Ask your questions in the Mentor Special Chat inside the Community and use @Mentor so they get picked up live.</p>
         <Link href="/community" className="btn btn-amber">Open Mentor Special Chat →</Link>

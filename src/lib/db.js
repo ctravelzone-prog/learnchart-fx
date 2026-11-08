@@ -11,6 +11,25 @@
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+// Seed sources for the admin-managed content. These two modules import
+// nothing from db.js, so there is no import cycle.
+import { FAQ_GENERAL, FAQ_ENROLLMENT } from "./faq-data.js";
+import {
+  SITE,
+  MENTORS,
+  STATS,
+  TESTIMONIALS,
+  SOCIALS,
+  BROKERS,
+  INSIDE_VIDEO_ID,
+  LIVE_STREAM_PROVIDER,
+  CONSULT_PROVIDER,
+  CONTACT_INFO,
+} from "./config.js";
+// (Admin password hashing uses node:crypto scrypt directly here —
+// db.js must not import auth.js, which itself imports db.js.)
+
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), "data", "learnchart.db");
 
@@ -75,7 +94,18 @@ CREATE TABLE IF NOT EXISTS courses_services (
   button_type TEXT NOT NULL,
   button_label TEXT NOT NULL,
   features_json TEXT NOT NULL DEFAULT '[]',
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  -- Added with the master admin panel (Nov 2026): a course added from
+  -- /admin can have video lessons + a Course Key (has_videos = 1) and
+  -- can unlock an area (unlocks = 'none' | 'live-room' |
+  -- 'consultation'). Community stays "any enrollment" for every
+  -- course, so it needs no flag here. "image" is the card banner
+  -- (uploaded from the admin course form); "badge" is the small ribbon
+  -- on the card (e.g. "★ BESTSELLER", empty = none).
+  has_videos INTEGER NOT NULL DEFAULT 0,
+  unlocks TEXT NOT NULL DEFAULT 'none',
+  image TEXT NOT NULL DEFAULT '',
+  badge TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS enrollments (
@@ -237,6 +267,79 @@ CREATE TABLE IF NOT EXISTS binance_pay_orders (
   status TEXT NOT NULL DEFAULT 'created',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- MASTER ADMIN PANEL (Nov 2026) — the admin area is a separate login
+-- with its own sessions, never the user session. Admins are the site
+-- owner only; there is no public admin registration.
+CREATE TABLE IF NOT EXISTS admins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  password_salt TEXT NOT NULL,
+  password_changed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token TEXT PRIMARY KEY,
+  admin_id INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+
+-- FAQ questions as DATABASE records (were a static file before the
+-- admin panel). The public FAQ page reads this table; the static file
+-- stays only as the seed source + fallback.
+CREATE TABLE IF NOT EXISTS faqs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category TEXT NOT NULL,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Mentors as DATABASE records (were config constants before). The
+-- public Mentors page reads this table; config.js stays as the seed
+-- source + fallback.
+CREATE TABLE IF NOT EXISTS mentors (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL,
+  badge TEXT NOT NULL,
+  title TEXT NOT NULL,
+  bio TEXT NOT NULL,
+  focus_tags_json TEXT NOT NULL DEFAULT '[]',
+  points_json TEXT NOT NULL DEFAULT '[]',
+  photo TEXT NOT NULL
+);
+
+-- Admin-editable site settings (stats, testimonials, socials, brokers,
+-- providers, contact info). One row per key; values are plain text or
+-- JSON. The public pages read these with config.js as the fallback, so
+-- the site keeps working on a fresh database before anything is edited.
+-- NOTE: Render's free tier wipes this SQLite file on every redeploy,
+-- so admin edits reset on redeploy until the site moves to real hosting.
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+-- Admin-editable PAGE CONTENT (Home / Contact / Mentors). One row per
+-- page + section + field, e.g. ("home", "hero", "title", "...").
+-- The pages read these through src/lib/page-content.js, which merges
+-- them over the config defaults — so nothing changes visually until
+-- the owner edits a field in /admin/pages. Images are stored as URLs
+-- ("/uploads/pages/...") in the same table; the files themselves are
+-- uploaded through the admin panel. Same redeploy-wipe note as above.
+CREATE TABLE IF NOT EXISTS page_content (
+  page TEXT NOT NULL,
+  section TEXT NOT NULL,
+  field TEXT NOT NULL,
+  value TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (page, section, field)
+);
 `; 
 
 // --- Seed: the three offers from prompt Section 10 ------------------------
@@ -247,7 +350,7 @@ function seed(handle) {
   if (count > 0) return; // already seeded — never re-seed over live data
 
   const insertCourse = handle.prepare(
-    "INSERT INTO courses_services (slug, title, subtitle, level, status, price_label, price_cents, button_type, button_label, features_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO courses_services (slug, title, subtitle, level, status, price_label, price_cents, button_type, button_label, features_json, sort_order, has_videos, unlocks, image, badge) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
 
   const forexId = insertCourse.run(
@@ -269,7 +372,11 @@ function seed(handle) {
       "Risk & Capital Management",
       "24/7 Market Updates & Learning Support",
     ]),
-    1
+    1,
+    1,
+    "none",
+    "/images/mentor-desk.webp",
+    "★ BESTSELLER"
   ).lastInsertRowid;
 
   insertCourse.run(
@@ -291,7 +398,11 @@ function seed(handle) {
       "Daily Trade Setups and Market Reviews",
       "Live Support for Trade Planning",
     ]),
-    2
+    2,
+    0,
+    "live-room",
+    "/images/mentor-studio.webp",
+    ""
   );
 
   insertCourse.run(
@@ -313,7 +424,11 @@ function seed(handle) {
       "One-on-One Mentorship with Siam Chowdhury and Rex Mizan",
       "Live Audio / Video Discussion",
     ]),
-    3
+    3,
+    0,
+    "consultation",
+    "/images/consultation-call.webp",
+    ""
   );
 
   // 10 lessons, matching the "10 Lessons / 1.5 hrs" course shape.
@@ -346,6 +461,138 @@ function seed(handle) {
     "Welcome to the Mentor Special Chat — Siam Chowdhury & Rex Mizan answer here during live sessions. Mention @Mentor and your question gets picked up live."
   );
 }
+// --- Admin seed: preview-default login ---------------------------------
+// Used ONLY when ADMIN_EMAIL / ADMIN_PASSWORD env vars are not set.
+// Only the HASH + SALT are in this file — the plain password is never
+// committed anywhere; it was generated once and handed to the site owner
+// separately. Change it in the admin panel (change-password) or set the
+// env vars. Same scrypt parameters as src/lib/auth.js (64-byte hash).
+const DEFAULT_ADMIN_EMAIL = "admin@learnchart.test";
+const DEFAULT_ADMIN_SALT = "ce75137f04cb354a592f2fbb339a0e01";
+const DEFAULT_ADMIN_HASH =
+  "3d32809942b9cd5263653d0efd65d53d89c5c121942d58cfee7aa531c3fa2472a19150d57a46fa35ec69d2e0dd8123f0c2fa9df569033bcfe5fffbd5bb216858";
+
+function scryptHash(password, salt) {
+  return crypto.scryptSync(password, salt, 64).toString("hex");
+}
+
+// --- Column migrations (for databases created before the admin panel) ---
+// SQLite has no "ADD COLUMN IF NOT EXISTS", so check PRAGMA first.
+function migrateColumns(handle) {
+  const userCols = handle.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
+  if (!userCols.includes("status")) {
+    handle.exec("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+  }
+  const contactCols = handle.prepare("PRAGMA table_info(contact_messages)").all().map((c) => c.name);
+  if (!contactCols.includes("status")) {
+    handle.exec("ALTER TABLE contact_messages ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
+  }
+  // Course flags added with the admin panel (Nov 2026): video lessons +
+  // Course Key (has_videos), area unlocked (unlocks), card image + badge.
+  // The backfill below runs ONLY in the boot where a column is first
+  // added to an old database — never again after that. (If it ran on
+  // every boot, an admin edit such as turning a flag off would be
+  // silently reverted.) Admin-added courses are never touched.
+  const courseCols = handle.prepare("PRAGMA table_info(courses_services)").all().map((c) => c.name);
+  let courseFlagsAdded = false;
+  if (!courseCols.includes("has_videos")) {
+    handle.exec("ALTER TABLE courses_services ADD COLUMN has_videos INTEGER NOT NULL DEFAULT 0");
+    courseFlagsAdded = true;
+  }
+  if (!courseCols.includes("unlocks")) {
+    handle.exec("ALTER TABLE courses_services ADD COLUMN unlocks TEXT NOT NULL DEFAULT 'none'");
+    courseFlagsAdded = true;
+  }
+  if (!courseCols.includes("image")) {
+    handle.exec("ALTER TABLE courses_services ADD COLUMN image TEXT NOT NULL DEFAULT ''");
+    courseFlagsAdded = true;
+  }
+  if (!courseCols.includes("badge")) {
+    handle.exec("ALTER TABLE courses_services ADD COLUMN badge TEXT NOT NULL DEFAULT ''");
+    courseFlagsAdded = true;
+  }
+  if (courseFlagsAdded) {
+    handle.prepare("UPDATE courses_services SET has_videos = 1, unlocks = 'none' WHERE slug = 'forex-premium-course'").run();
+    handle.prepare("UPDATE courses_services SET has_videos = 0, unlocks = 'live-room' WHERE slug = 'premium-live-trade-support'").run();
+    handle.prepare("UPDATE courses_services SET has_videos = 0, unlocks = 'consultation' WHERE slug = 'trading-consultation'").run();
+    handle.prepare("UPDATE courses_services SET badge = '★ BESTSELLER' WHERE slug = 'forex-premium-course' AND (badge IS NULL OR badge = '')").run();
+    // Original course card images (the design's photos) — set only
+    // when empty, so an admin-chosen image is never overwritten.
+    handle.prepare("UPDATE courses_services SET image = '/images/mentor-desk.webp' WHERE slug = 'forex-premium-course' AND (image IS NULL OR image = '')").run();
+    handle.prepare("UPDATE courses_services SET image = '/images/mentor-studio.webp' WHERE slug = 'premium-live-trade-support' AND (image IS NULL OR image = '')").run();
+    handle.prepare("UPDATE courses_services SET image = '/images/consultation-call.webp' WHERE slug = 'trading-consultation' AND (image IS NULL OR image = '')").run();
+  }
+}
+
+// --- Seed the admin-managed content (idempotent, guarded by counts) -----
+// Runs on every init but only inserts when the table is still empty, so
+// it never overwrites live admin edits. Runs AFTER seed() — courses must
+// exist first only for the lesson seed, not for this one.
+function seedAdminDefaults(handle) {
+  // FAQ: static file is the seed source; the table is the live source.
+  if (handle.prepare("SELECT COUNT(*) AS c FROM faqs").get().c === 0) {
+    const insertFaq = handle.prepare(
+      "INSERT INTO faqs (category, question, answer, sort_order) VALUES (?, ?, ?, ?)"
+    );
+    FAQ_GENERAL.forEach((f, i) => insertFaq.run("General", f.q, f.a, i + 1));
+    FAQ_ENROLLMENT.forEach((f, i) => insertFaq.run("Enrollment", f.q, f.a, i + 1));
+  }
+
+  // Mentors: config.js is the seed source; the table is the live source.
+  if (handle.prepare("SELECT COUNT(*) AS c FROM mentors").get().c === 0) {
+    const insertMentor = handle.prepare(
+      "INSERT INTO mentors (id, name, role, badge, title, bio, focus_tags_json, points_json, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    for (const m of MENTORS) {
+      insertMentor.run(
+        m.id, m.name, m.role, m.badge, m.title, m.bio,
+        JSON.stringify(m.focusTags || []), JSON.stringify(m.points || []), m.photo
+      );
+    }
+  }
+
+  // Settings: one row per key, config.js values as the first seed.
+  // INSERT OR IGNORE keeps admin edits safe on later boots.
+  const settingDefaults = {
+    stats: JSON.stringify(STATS),
+    testimonials: JSON.stringify(TESTIMONIALS),
+    socials: JSON.stringify(SOCIALS),
+    brokers: JSON.stringify(BROKERS),
+    inside_video_id: INSIDE_VIDEO_ID,
+    live_stream_provider: LIVE_STREAM_PROVIDER,
+    consult_provider: CONSULT_PROVIDER,
+    contact_email: CONTACT_INFO.email,
+    contact_phone: CONTACT_INFO.phone,
+    contact_address: CONTACT_INFO.address,
+    next_batch_date: SITE.nextBatchDate || "",
+    site_mission: SITE.mission || "",
+  };
+  const insertSetting = handle.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
+  for (const [key, value] of Object.entries(settingDefaults)) {
+    insertSetting.run(key, value);
+  }
+
+  // Admin account. Env vars win when set (upsert = the env password is
+  // authoritative, so rotating it is just changing the env var).
+  // Otherwise, seed the preview-default admin once (password_changed=0
+  // so the panel shows the "please change your password" notice).
+  const envEmail = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const envPassword = process.env.ADMIN_PASSWORD || "";
+  if (envEmail && envPassword) {
+    const salt = crypto.randomBytes(16).toString("hex");
+    handle
+      .prepare(
+        `INSERT INTO admins (email, password_hash, password_salt, password_changed) VALUES (?, ?, ?, 1)
+         ON CONFLICT(email) DO UPDATE SET password_hash = excluded.password_hash, password_salt = excluded.password_salt, password_changed = 1`
+      )
+      .run(envEmail, scryptHash(envPassword, salt), salt);
+  } else if (handle.prepare("SELECT COUNT(*) AS c FROM admins").get().c === 0) {
+    handle
+      .prepare("INSERT INTO admins (email, password_hash, password_salt, password_changed) VALUES (?, ?, ?, 0)")
+      .run(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_HASH, DEFAULT_ADMIN_SALT);
+  }
+}
+
 // --- Init (schema + seed) with a lock retry ---------------------------
 // Next.js evaluates many route/page modules in parallel during `next
 // build`, so several connections can try to create the schema at the
@@ -358,7 +605,9 @@ function initDatabase(handle) {
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
       handle.exec(SCHEMA);
+      migrateColumns(handle);
       seed(handle);
+      seedAdminDefaults(handle);
       return;
     } catch (err) {
       const busy = err && (err.errcode === 5 || /locked|busy/i.test(err.message || ""));
@@ -412,7 +661,8 @@ export function getUserByEmail(email) {
 export function getEnrollments(userId) {
   return getDb()
     .prepare(
-      `SELECT e.*, c.slug AS course_slug, c.title AS course_title
+      `SELECT e.*, c.slug AS course_slug, c.title AS course_title,
+              c.has_videos AS course_has_videos, c.unlocks AS course_unlocks
        FROM enrollments e JOIN courses_services c ON c.id = e.course_id
        WHERE e.user_id = ? ORDER BY e.created_at ASC`
     )
@@ -429,4 +679,232 @@ export function hasEnrollment(userId, courseSlug) {
     )
     .get(userId, courseSlug);
   return !!row;
+}
+
+// --- Admin helpers (master admin panel only) ---------------------------
+// Every admin page and /api/admin route reads through these; nothing in
+// the admin area opens its own queries.
+
+export function getAdminByEmail(email) {
+  return getDb().prepare("SELECT * FROM admins WHERE email = ?").get(String(email).toLowerCase()) || null;
+}
+
+export function getAdminById(id) {
+  return getDb().prepare("SELECT id, email, password_changed, created_at FROM admins WHERE id = ?").get(id) || null;
+}
+
+export function getFaqs() {
+  return getDb()
+    .prepare("SELECT * FROM faqs ORDER BY CASE category WHEN 'General' THEN 0 ELSE 1 END, sort_order ASC, id ASC")
+    .all();
+}
+
+export function getFaqById(id) {
+  return getDb().prepare("SELECT * FROM faqs WHERE id = ?").get(id) || null;
+}
+
+export function getMentors() {
+  return getDb()
+    .prepare("SELECT * FROM mentors ORDER BY id ASC")
+    .all()
+    .map((row) => ({
+      ...row,
+      focusTags: JSON.parse(row.focus_tags_json || "[]"),
+      points: JSON.parse(row.points_json || "[]"),
+    }));
+}
+
+export function getMentorById(id) {
+  const row = getDb().prepare("SELECT * FROM mentors WHERE id = ?").get(id);
+  if (!row) return null;
+  return { ...row, focusTags: JSON.parse(row.focus_tags_json || "[]"), points: JSON.parse(row.points_json || "[]") };
+}
+
+export function getSetting(key) {
+  const row = getDb().prepare("SELECT value FROM settings WHERE key = ?").get(key);
+  return row ? row.value : null;
+}
+
+export function setSetting(key, value) {
+  getDb()
+    .prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run(key, value);
+}
+
+// --- Page content (admin-editable Home / Contact / Mentors copy) --------
+// One row per page + section + field. lib/page-content.js merges these
+// over the code defaults; these two helpers are the only DB access.
+export function getPageContentRows(page) {
+  return getDb()
+    .prepare("SELECT section, field, value FROM page_content WHERE page = ?")
+    .all(page);
+}
+
+export function setPageContent(page, section, field, value) {
+  getDb()
+    .prepare(
+      `INSERT INTO page_content (page, section, field, value, updated_at)
+       VALUES (?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(page, section, field) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+    )
+    .run(page, section, field, value);
+}
+
+// Dashboard numbers, each a single cheap query.
+export function getAdminStats() {
+  const db = getDb();
+  const users = db.prepare("SELECT COUNT(*) AS c FROM users").get().c;
+  const enrollmentsByCourse = db
+    .prepare(
+      `SELECT c.slug, c.title, COUNT(e.id) AS count FROM courses_services c
+       LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.id ORDER BY c.sort_order ASC`
+    )
+    .all();
+  const paymentsByMethod = db
+    .prepare("SELECT method, status, COUNT(*) AS count FROM payments GROUP BY method, status ORDER BY method ASC")
+    .all();
+  const posts = db.prepare("SELECT COUNT(*) AS c FROM posts").get().c;
+  const unreadContact = db.prepare("SELECT COUNT(*) AS c FROM contact_messages WHERE status = 'new'").get().c;
+  return { users, enrollmentsByCourse, paymentsByMethod, posts, unreadContact };
+}
+
+export function listUsers(search) {
+  const db = getDb();
+  const q = `%${String(search || "").trim()}%`;
+  const rows = search
+    ? db
+        .prepare(
+          `SELECT u.id, u.name, u.email, u.status, u.created_at,
+                  (SELECT COUNT(*) FROM enrollments e WHERE e.user_id = u.id) AS enrollments
+           FROM users u WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY u.created_at DESC`
+        )
+        .all(q, q)
+    : db
+        .prepare(
+          `SELECT u.id, u.name, u.email, u.status, u.created_at,
+                  (SELECT COUNT(*) FROM enrollments e WHERE e.user_id = u.id) AS enrollments
+           FROM users u ORDER BY u.created_at DESC`
+        )
+        .all();
+  return rows;
+}
+
+export function getAdminUserDetail(id) {
+  const db = getDb();
+  const user = db
+    .prepare("SELECT id, name, email, profile_pic, status, created_at FROM users WHERE id = ?")
+    .get(id);
+  if (!user) return null;
+  const enrollments = getEnrollments(id);
+  const posts = db
+    .prepare("SELECT id, text, image_path, drive_file_id, created_at FROM posts WHERE user_id = ? ORDER BY created_at DESC")
+    .all(id);
+  return { ...user, enrollments, posts };
+}
+
+export function listEnrollments(filterSlug) {
+  const db = getDb();
+  if (filterSlug) {
+    return db
+      .prepare(
+        `SELECT e.*, c.slug AS course_slug, c.title AS course_title, u.name AS user_name, u.email AS user_email
+         FROM enrollments e JOIN courses_services c ON c.id = e.course_id
+         JOIN users u ON u.id = e.user_id
+         WHERE c.slug = ? ORDER BY e.created_at DESC`
+      )
+      .all(filterSlug);
+  }
+  return db
+    .prepare(
+      `SELECT e.*, c.slug AS course_slug, c.title AS course_title, u.name AS user_name, u.email AS user_email
+       FROM enrollments e JOIN courses_services c ON c.id = e.course_id
+       JOIN users u ON u.id = e.user_id ORDER BY e.created_at DESC`
+    )
+    .all();
+}
+
+// One enrollment with its student, course, Course Key (encrypted) and
+// any verified payments for that student + course.
+export function getEnrollmentDetail(id) {
+  const db = getDb();
+  const e = db
+    .prepare(
+      `SELECT e.*, c.slug AS course_slug, c.title AS course_title,
+              c.has_videos AS course_has_videos, u.name AS user_name, u.email AS user_email
+       FROM enrollments e JOIN courses_services c ON c.id = e.course_id
+       JOIN users u ON u.id = e.user_id WHERE e.id = ?`
+    )
+    .get(id);
+  if (!e) return null;
+  const key = db.prepare("SELECT key_encrypted FROM course_keys WHERE enrollment_id = ?").get(id);
+  const payments = db
+    .prepare("SELECT * FROM payments WHERE user_id = ? AND course_slug = ? ORDER BY created_at DESC")
+    .all(e.user_id, e.course_slug);
+  return { ...e, keyEncrypted: key ? key.key_encrypted : null, payments };
+}
+
+export function listPayments() {
+  return getDb()
+    .prepare(
+      `SELECT p.*, u.name AS user_name, u.email AS user_email
+       FROM payments p JOIN users u ON u.id = p.user_id ORDER BY p.created_at DESC`
+    )
+    .all();
+}
+
+export function getPayment(id) {
+  const row = getDb()
+    .prepare(
+      `SELECT p.*, u.name AS user_name, u.email AS user_email
+       FROM payments p JOIN users u ON u.id = p.user_id WHERE p.id = ?`
+    )
+    .get(id);
+  return row || null;
+}
+
+export function listPostsAdmin() {
+  return getDb()
+    .prepare(
+      `SELECT p.*, u.name AS author_name, u.email AS author_email,
+              (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count,
+              (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count
+       FROM posts p JOIN users u ON u.id = p.user_id ORDER BY p.created_at DESC`
+    )
+    .all();
+}
+
+export function getPostComments(postId) {
+  return getDb()
+    .prepare(
+      `SELECT c.*, u.name AS author_name FROM comments c
+       JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC`
+    )
+    .all(postId);
+}
+
+export function listContactMessages() {
+  return getDb().prepare("SELECT * FROM contact_messages ORDER BY created_at DESC").all();
+}
+
+export function getContactMessage(id) {
+  return getDb().prepare("SELECT * FROM contact_messages WHERE id = ?").get(id) || null;
+}
+
+export function getAllLessons() {
+  return getDb()
+    .prepare(
+      `SELECT l.*, c.title AS course_title FROM lessons l
+       JOIN courses_services c ON c.id = l.course_id ORDER BY c.sort_order ASC, l.position ASC`
+    )
+    .all();
+}
+
+export function getLesson(id) {
+  return getDb().prepare("SELECT * FROM lessons WHERE id = ?").get(id) || null;
+}
+
+export function getCourseById(id) {
+  const row = getDb().prepare("SELECT * FROM courses_services WHERE id = ?").get(id);
+  if (!row) return null;
+  return { ...row, features: JSON.parse(row.features_json || "[]") };
 }

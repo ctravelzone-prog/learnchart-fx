@@ -1,15 +1,26 @@
-# LearnChart FX — Phase 1 (User Side Only)
+# LearnChart FX — User Side + Master Admin Panel
 
 A forex trading education website for **Siam Chowdhury** and **Rex Mizan**.
 Built from the LearnChart FX full system prompt (24 sections) and the
 UI/UX designer mockup (dark theme, floating pill nav, yellow–orange
 gradient accent #FFC531 → #FF9E2C, Poppins / Manrope).
 
-> **Phase 1 = user side only. There is NO admin panel, admin login, admin
-> route or admin-only UI in this build.** The structure is admin-ready only:
-> courses/services live as database records and every placeholder is driven
-> from `src/lib/config.js` / the database seed, so a later admin phase can
-> manage them without restructuring the site.
+> **Master admin panel (Nov 2026):** the full site is controlled from
+> `/admin` — users, courses (add new ones with video lessons + key and
+> area unlocks, no code changes), enrollments, payments, lessons
+> (YouTube IDs), Course Keys (view + resend), community moderation,
+> FAQ, contact inbox, mentors, page content + pictures (Home / Contact /
+> Mentors), site settings, payment + email settings, and a status page.
+> Admin login: `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars when set, or
+> the seeded preview-default admin (see "Admin login" below). The admin
+> session is separate from student sessions; no admin links exist in
+> the public nav, and there is no public admin registration.
+>
+> **Hosting caveat:** on Render's free tier the SQLite file (and the
+> `public/uploads/` folder) is wiped on every redeploy, so admin edits,
+> accounts and settings reset on redeploy until the site moves to real
+> hosting. Env vars survive a wipe and are the fallback for payment +
+> email settings.
 
 ## Quick start
 
@@ -50,12 +61,34 @@ For development: `npm run dev`.
 | `/signup`, `/login`, `/forgot-password`, `/reset-password` | Auth |
 | `/profile` | Details, profile picture, My Enrollments, My Posts / My Uploads, Resend-my-key (Forex students) |
 | `/enroll/[slug]`, `/enroll/[slug]/success` | Enrollment + confirmation (Course Key is emailed, never shown) |
-| `/course-videos` | 10 lessons — locked until Forex enrollment + valid Course Key, asked on EVERY visit |
+| `/course-videos` | Video lessons — locked until enrollment in a video course + valid Course Key, asked on EVERY visit; `?course=<slug>` picks the course (defaults to Forex) |
 | `/community` | Members-only feed, composer, Mentor Special Chat (member chat moved to `/chat`) |
 | `/chat` | Member chat — member list + one-to-one conversation, its own page |
 | `/members/[id]` | A member's profile page — their name, picture, posts/uploads |
-| `/live-room` | Live Room — Premium Live Trade Support members only |
-| `/consultation` | Trading Consultation — Consultation members only, Coming Soon |
+| `/live-room` | Live Room — any enrollment whose course unlocks it (Premium Live Trade Support) |
+| `/consultation` | Trading Consultation — any enrollment whose course unlocks it (Consultation), Coming Soon |
+| `/admin` | **Master admin panel** — dashboard, users, courses, enrollments, payments, lessons, community, FAQ, contact inbox, mentors, pages/content, site settings, payment + email settings, status, change password |
+
+## Admin login
+
+- **URL:** `/admin/login` (no link in the public nav).
+- **Credentials:** set `ADMIN_EMAIL` + `ADMIN_PASSWORD` in the environment
+  to choose them. Without those env vars, the site seeds a preview-default
+  admin (`admin@learnchart.test` — the password is handed to the site owner
+  separately and never committed to the repo). Change it in the panel
+  (Change Password) — the dashboard shows a "please change your admin
+  password" notice until it is changed.
+- **Admin-editable, no code needed:** courses (incl. new video courses with
+  keys + area unlocks), lessons + YouTube IDs, Home/Contact/Mentors copy +
+  pictures, stats/testimonials/socials/brokers, mentors, FAQ, payment rails
+  (BEP20 address + BscScan key, Binance Pay ID + read-only API key/secret,
+  merchant keys, USDT amount, per-rail on/off) and SMTP email settings.
+  Secrets are AES-encrypted at rest, masked in the UI (last 4 chars only),
+  and never returned by any API.
+- **Still needs code/env (flagged, not admin-editable):** adding a NEW
+  payment method (e.g. ZiniPay) is a code integration; the encryption key
+  (`KEY_ENCRYPTION_SECRET`) and session secret are env vars; layout/design
+  changes are code. Everything else is in the panel.
 
 ## Access rules (enforced server-side, in `src/lib/access.js`)
 

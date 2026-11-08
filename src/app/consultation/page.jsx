@@ -10,6 +10,7 @@ import { getDb } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import { canEnterConsultation } from "../../lib/access.js";
 import { CONSULT_PROVIDER } from "../../lib/config.js";
+import { getSingleSetting } from "../../lib/settings.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
 import CopyRequest from "../../components/CopyRequest.jsx";
 
@@ -59,7 +60,7 @@ export default async function ConsultationPage({ searchParams }) {
       </p>
       <div className="alert alert-info">
         This service is still <strong>Developing / Coming Soon</strong>. Your booking request below is saved and the
-        mentor team will confirm your live audio/video slot. Audio/video provider: <strong>{CONSULT_PROVIDER}</strong>
+        mentor team will confirm your live audio/video slot. Audio/video provider: <strong>{getSingleSetting("consult_provider", CONSULT_PROVIDER)}</strong>
       </div>
 
       {sp?.booked === "1" ? (

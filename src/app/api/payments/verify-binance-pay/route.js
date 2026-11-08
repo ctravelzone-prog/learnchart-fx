@@ -16,7 +16,7 @@ import {
   completePaidEnrollment,
   isTxRefUsed,
   isBinancePayTxConfigured,
-  coursePriceUsdt,
+  getPayableAmountUsdt,
 } from "../../../../lib/payments.js";
 
 const ERRORS = {
@@ -49,7 +49,7 @@ export async function POST(request) {
   if (!isBinancePayTxConfigured()) return back("not-configured");
   if (orderId && isTxRefUsed(orderId)) return back("duplicate");
 
-  const expectedAmount = coursePriceUsdt(course);
+  const expectedAmount = getPayableAmountUsdt(course);
   const result = await verifyBinancePayTx({ orderId, expectedAmountUsdt: expectedAmount });
   if (!result.ok) return back(result.reason);
 

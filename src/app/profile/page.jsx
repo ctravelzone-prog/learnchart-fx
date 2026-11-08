@@ -1,14 +1,14 @@
 // ---------------------------------------------------------------------------
 // profile/page.jsx — My Profile (prompt Section 15). Login required.
 // Shows details, uploadable profile picture, My Enrollments, a My Course
-// Videos link for Forex students, and My Posts / My Uploads (the user's
-// own community posts). The Course Key is NEVER shown here — since Nov
-// 2026 it is emailed to the student's Gmail; a Forex student can ask
-// for it to be re-sent from here. Gated page: noindex.
+// Videos link for every video-course enrollment, and My Posts / My Uploads
+// (the user's own community posts). The Course Key is NEVER shown here —
+// since Nov 2026 it is emailed to the student's Gmail; a video-course
+// student can ask for it to be re-sent from here. Gated page: noindex.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getDb, getEnrollments, hasEnrollment } from "../../lib/db.js";
+import { getDb, getEnrollments } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import PostCard from "../../components/PostCard.jsx";
 
@@ -45,7 +45,6 @@ export default async function ProfilePage({ searchParams }) {
   if (!user) redirect("/login?next=/profile");
 
   const enrollments = getEnrollments(user.id);
-  const isForex = hasEnrollment(user.id, "forex-premium-course");
   const myPosts = getMyPosts(user.id);
 
   return (
@@ -91,17 +90,18 @@ export default async function ProfilePage({ searchParams }) {
                 <p className="small muted" style={{ margin: "4px 0" }}>
                   Status: {e.status} · Enrolled {new Date(e.created_at).toLocaleDateString("en-GB")}
                 </p>
-                {e.course_slug === "forex-premium-course" ? (
+                {e.course_has_videos ? (
                   <>
                     <p className="small muted">
                       Your Course Key was emailed to your Gmail when you enrolled. Enter it on the Course Videos
                       page — it is asked again every time you open the page.
                     </p>
                     <form action="/api/course-videos/resend-key" method="post" style={{ marginTop: 8 }}>
+                      <input type="hidden" name="course" value={e.course_slug} />
                       <button type="submit" className="btn btn-dark btn-sm">Resend my key to my Gmail</button>
                     </form>
                     <p style={{ marginTop: 10 }}>
-                      <Link href="/course-videos" className="btn btn-amber btn-sm">My Course Videos →</Link>
+                      <Link href={`/course-videos?course=${e.course_slug}`} className="btn btn-amber btn-sm">My Course Videos →</Link>
                     </p>
                   </>
                 ) : null}

@@ -32,7 +32,7 @@ import {
   getBep20Config,
   getBinancePayTxConfig,
   isBinancePayMerchantConfigured,
-  coursePriceUsdt,
+  getPayableAmountUsdt,
 } from "../../../lib/payments.js";
 import Bep20Method from "../../../components/payments/Bep20Method.jsx";
 import BinancePayMethod from "../../../components/payments/BinancePayMethod.jsx";
@@ -51,7 +51,9 @@ export default async function EnrollPage({ params, searchParams }) {
   if (hasEnrollment(user.id, slug)) redirect(`/enroll/${slug}/success`);
 
   const isPaid = course.price_cents > 0;
-  const priceUsdt = coursePriceUsdt(course);
+  // The USDT amount students must send: the admin-set amount wins when
+  // present (Payment Settings), otherwise the course price ($250).
+  const priceUsdt = getPayableAmountUsdt(course);
 
   // BEP20 rail state (env only — never invented).
   const bep20 = getBep20Config();

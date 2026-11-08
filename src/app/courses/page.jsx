@@ -1,20 +1,15 @@
 // ---------------------------------------------------------------------------
 // courses/page.jsx — Courses & Services (prompt Section 10). Separate page
-// from Home. The three offers come from the database (seeded from the
-// prompt); the page never hard-codes them, so the later master admin can
-// add more. Enrolled state is read from the session on the server.
+// from Home. The offers come from the database (seeded from the prompt);
+// the page never hard-codes them, so the master admin can add more.
+// Card images and badges come from the course record too (editable in
+// /admin). Enrolled state is read from the session on the server.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
-import { getAllCourses, getEnrollments } from "../../lib/db.js";
+import { getAllCourses, getEnrollments, getLessons } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import { PAYMENT_METHOD } from "../../lib/config.js";
-
-// Course card banner photos — the design's course images, by course slug.
-const COURSE_IMAGES = {
-  "forex-premium-course": { src: "/images/mentor-desk.webp", alt: "Forex Trading Premium Course with mentor Siam Chowdhury" },
-  "premium-live-trade-support": { src: "/images/mentor-studio.webp", alt: "Premium Live Trade Support — mentor live in the trading studio" },
-  "trading-consultation": { src: "/images/consultation-call.webp", alt: "Trading Consultation — one-on-one session with the mentor" },
-};
+import { getUsdtAmount } from "../../lib/settings.js";
 
 export const metadata = {
   title: "Courses & Services — LearnChart FX",
@@ -41,6 +36,12 @@ export default async function CoursesPage() {
   const user = await getSessionUser();
   const myEnrollments = user ? getEnrollments(user.id) : [];
   const enrolledSlugs = new Set(myEnrollments.map((e) => e.course_slug));
+  // Lesson counts for video courses (shown on the Watch link).
+  const lessonCounts = {};
+  for (const c of courses) {
+    if (c.has_videos) lessonCounts[c.slug] = getLessons(c.id).length;
+  }
+  const usdtAmount = getUsdtAmount(250);
 
   return (
     <div className="wrap section">
@@ -53,10 +54,10 @@ export default async function CoursesPage() {
       <div className="grid-3" style={{ marginTop: 28 }}>
         {courses.map((c) => (
           <div className="card" key={c.slug}>
-            {COURSE_IMAGES[c.slug] ? (
+            {c.image ? (
               <div className="course-thumb">
-                <img src={COURSE_IMAGES[c.slug].src} alt={COURSE_IMAGES[c.slug].alt} />
-                {c.slug === "forex-premium-course" ? <span className="badge badge-amber thumb-badge">★ BESTSELLER</span> : null}
+                <img src={c.image} alt={c.title} />
+                {c.badge ? <span className="badge badge-amber thumb-badge">{c.badge}</span> : null}
               </div>
             ) : null}
             <h2 style={{ marginTop: 10 }}>{c.title}</h2>
@@ -70,10 +71,10 @@ export default async function CoursesPage() {
             </ul>
             <p className="price">{c.price_label}</p>
             <EnrollButton course={c} enrolled={enrolledSlugs.has(c.slug)} />
-            {c.slug === "forex-premium-course" && enrolledSlugs.has(c.slug) ? (
+            {c.has_videos && enrolledSlugs.has(c.slug) ? (
               <div style={{ marginTop: 12 }}>
-                <Link href="/course-videos" className="btn btn-dark btn-sm">
-                  ▶ Watch Course Videos — 10 lessons, unlock with your key 🔑
+                <Link href={`/course-videos?course=${c.slug}`} className="btn btn-dark btn-sm">
+                  ▶ Watch Course Videos — {lessonCounts[c.slug] || ""} lessons, unlock with your key 🔑
                 </Link>
               </div>
             ) : null}
@@ -89,11 +90,11 @@ export default async function CoursesPage() {
       <div className="card" style={{ marginTop: 28 }}>
         <h3>Payment</h3>
         <p className="muted">
-          Payment method: <strong>{PAYMENT_METHOD}</strong> — pay exactly 250 USDT on Binance and the site
+          Payment method: <strong>{PAYMENT_METHOD}</strong> — pay exactly {usdtAmount} USDT on Binance and the site
           verifies your payment automatically. No manual check, no waiting for the owner.
         </p>
         <p className="small muted">
-          The Forex Trading Premium Course is $250 · 10 sessions / 10 lessons.
+          Paid courses are paid in USDT on Binance; free services enroll on confirmation.
         </p>
       </div>
     </div>

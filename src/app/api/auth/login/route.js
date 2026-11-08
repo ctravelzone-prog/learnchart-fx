@@ -17,6 +17,12 @@ export async function POST(request) {
   if (!ok) {
     return redirectTo(`/login?error=${encodeURIComponent("Invalid email or password.")}`);
   }
+  // A deactivated account (admin action) cannot log in, even with the
+  // right password. The message says why, without leaking anything
+  // about other accounts.
+  if (user.status && user.status !== "active") {
+    return redirectTo(`/login?error=${encodeURIComponent("Your account is deactivated. Please contact support.")}`);
+  }
 
   await createSession(user.id);
   const dest = next.startsWith("/") ? next : "/profile";

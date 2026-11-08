@@ -10,7 +10,10 @@
 // stored; plain key is never stored) and EMAILS it to the student's
 // Gmail (Nov 2026 key rule — the key is never shown on the site). If the
 // email cannot be sent, enrollment still completes and the confirmation
-// page says so honestly.
+// page says so honestly. GENERALIZED (Nov 2026): ANY course with
+// has_videos = 1 gets a key exactly the same way — the Forex course is
+// just the first video course; a course added from admin with
+// has_videos works with zero code changes.
 // ---------------------------------------------------------------------------
 import { redirectTo } from "../../../lib/http.js";
 import { getDb, getCourseBySlug, hasEnrollment } from "../../../lib/db.js";
@@ -48,11 +51,13 @@ export async function POST(request) {
     .prepare("INSERT INTO enrollments (user_id, course_id, status, payment_status) VALUES (?, ?, 'active', ?)")
     .run(user.id, course.id, "free — enrolled on confirmation").lastInsertRowid;
 
-  // Forex course: one unique Course Key for THIS student + enrollment.
-  // The plain key exists only here, in this request — it is emailed to
-  // the student's Gmail right away and never shown on any page.
+  // Video course (has_videos): one unique Course Key for THIS student +
+  // enrollment. The plain key exists only here, in this request — it is
+  // emailed to the student's Gmail right away and never shown on any
+  // page. Any course added from admin with has_videos works the same
+  // way; the Forex course is just the first one.
   let keymail = null;
-  if (slug === "forex-premium-course") {
+  if (course.has_videos) {
     const key = generateCourseKey();
     db.prepare("INSERT INTO course_keys (enrollment_id, key_hash, key_encrypted) VALUES (?, ?, ?)")
       .run(enrollmentId, hashKey(key), encryptKey(key));

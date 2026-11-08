@@ -1,11 +1,14 @@
 // ---------------------------------------------------------------------------
 // Footer.jsx — shared footer (prompt Section 9, item 12). Links to the
 // gated areas go through the normal pages, so lock rules apply there.
+// The mission line is editable in Site Settings (default from config).
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { SITE } from "../lib/config.js";
+import { getSingleSetting } from "../lib/settings.js";
 
 export default function Footer() {
+  const mission = getSingleSetting("site_mission", SITE.mission);
   return (
     <footer className="footer">
       <div className="wrap">
@@ -15,7 +18,7 @@ export default function Footer() {
               <span className="mark">LC</span>
               <span className="name">LEARNCHART <span>FX</span></span>
             </div>
-            <p className="muted small" style={{ maxWidth: 420 }}>{SITE.mission}</p>
+            <p className="muted small" style={{ maxWidth: 420 }}>{mission}</p>
             <p className="muted small">
               YouTube · Instagram · TikTok · Telegram · Facebook — [Placeholder handles]
             </p>

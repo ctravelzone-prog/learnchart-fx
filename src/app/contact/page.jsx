@@ -1,10 +1,13 @@
 // ---------------------------------------------------------------------------
 // contact/page.jsx — Contact Us (prompt Section 14). The form saves the
-// message to the database and shows a success confirmation. Delivery to
-// an admin inbox belongs to the later master admin phase — no admin inbox
-// or admin UI is built here; messages wait in the contact_messages table.
+// message to the database and shows a success confirmation. The admin
+// reads + replies from the Contact Inbox in the master admin panel.
+// All copy on this page is editable from /admin/pages (Contact) —
+// headings, intro, channel cards, quick answers, form labels and the
+// support promise. The page has no picture slots in the design.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
+import { getPageContent } from "../../lib/page-content.js";
 
 export const metadata = {
   title: "Contact Us — LearnChart FX",
@@ -15,37 +18,43 @@ export default async function ContactPage({ searchParams }) {
   // Next.js 15: searchParams is a Promise — await it first.
   const sp = await searchParams;
   const sent = sp?.sent === "1";
+  // Page copy: /admin/pages, merged over the defaults.
+  const pc = getPageContent("contact");
+  const channels = [
+    { title: pc.channels.telegram_title, desc: pc.channels.telegram_desc },
+    { title: pc.channels.youtube_title, desc: pc.channels.youtube_desc },
+    { title: pc.channels.facebook_title, desc: pc.channels.facebook_desc },
+    { title: pc.channels.tiktok_title, desc: pc.channels.tiktok_desc },
+  ];
   return (
     <div className="wrap section">
       <p className="muted small">HOME › CONTACT US</p>
       <h1 style={{ fontSize: 40 }}>
-        Contact <span className="amber">Us</span>
+        {pc.main.heading_start} <span className="amber">{pc.main.heading_highlight}</span>
       </h1>
       <p className="muted">
-        Questions about the course, live trade support or consultation? Reach the LearnChart FX team on any
-        channel below — mentors Siam Chowdhury and Rex Mizan reply inside the member community.
+        {pc.main.intro}
       </p>
 
       <div className="grid-2" style={{ marginTop: 24 }}>
         <div>
           <div className="grid-2">
-            <div className="card"><h3>✈️ Telegram</h3><p className="muted small">Join our community — fastest replies and daily live trade updates. [Placeholder link]</p></div>
-            <div className="card"><h3>▶️ YouTube</h3><p className="muted small">Subscribe to our official channel for lessons and market breakdowns. [Placeholder link]</p></div>
-            <div className="card"><h3>👍 Facebook</h3><p className="muted small">Follow us on Facebook for batch news and student results. [Placeholder link]</p></div>
-            <div className="card"><h3>🎵 TikTok</h3><p className="muted small">Short trading lessons and live-session clips on our official channel. [Placeholder link]</p></div>
+            {channels.map((ch) => (
+              <div className="card" key={ch.title}><h3>{ch.title}</h3><p className="muted small">{ch.desc}</p></div>
+            ))}
           </div>
           <div className="card" style={{ marginTop: 16 }}>
-            <h3>Before You Write — Quick Answers</h3>
-            <p className="muted small">Most common questions are answered in the FAQ on the Home page. Community, Live Room and Consultation unlock after enrollment. Mentors are introduced on the open Mentors page.</p>
-            <Link href="/faq" className="btn btn-dark btn-sm">Read the FAQ →</Link>
+            <h3>{pc.quick.heading}</h3>
+            <p className="muted small">{pc.quick.text}</p>
+            <Link href="/faq" className="btn btn-dark btn-sm">{pc.quick.cta}</Link>
           </div>
         </div>
 
         <div className="card">
-          <h3>Send a message</h3>
+          <h3>{pc.form.heading}</h3>
           {sent ? (
             <div className="alert alert-ok">
-              Thank you — your message has been received. Our support team is available 24/7 and will reply as soon as possible (target: within 24 hours).
+              {pc.form.success}
             </div>
           ) : null}
           <form action="/api/contact" method="post">
@@ -65,10 +74,10 @@ export default async function ContactPage({ searchParams }) {
               <label htmlFor="cf-message">Message</label>
               <textarea id="cf-message" name="message" rows={5} required placeholder="Write your message…" />
             </div>
-            <button type="submit" className="btn btn-amber" style={{ width: "100%" }}>Send Message</button>
+            <button type="submit" className="btn btn-amber" style={{ width: "100%" }}>{pc.form.button}</button>
           </form>
           <p className="small muted" style={{ marginTop: 12 }}>
-            Support promise: 24/7 availability, response within &lt;24h as a support target — not a guarantee of any trading outcome.
+            {pc.form.promise}
           </p>
         </div>
       </div>

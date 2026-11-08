@@ -1,17 +1,18 @@
 // ---------------------------------------------------------------------------
 // FaqList.jsx — FAQ tabs + accordions (prompt Section 13, client side).
-// Tabs: All Questions / General (2) / Enrollment (9) — counts always
-// correct because they come from the data, not from typed numbers.
-// Accordions open/close on click and are keyboard-usable (<details>).
+// Tabs: All Questions / General / Enrollment — counts always correct
+// because they come from the data, not from typed numbers. Accordions
+// open/close on click and are keyboard-usable (<details>).
+// The questions come from the database (admin-editable); the parent
+// server page passes them in as `items` ({ category, question, answer }).
 // ---------------------------------------------------------------------------
 "use client";
 import { useState } from "react";
-import { FAQ_GENERAL, FAQ_ENROLLMENT } from "../lib/faq-data.js";
 
-export default function FaqList() {
+export default function FaqList({ items }) {
   const [tab, setTab] = useState("all");
-  const general = FAQ_GENERAL.map((f) => ({ ...f, cat: "General" }));
-  const enrollment = FAQ_ENROLLMENT.map((f) => ({ ...f, cat: "Enrollment" }));
+  const general = items.filter((f) => f.category === "General");
+  const enrollment = items.filter((f) => f.category === "Enrollment");
   const all = [...general, ...enrollment];
   const shown = tab === "all" ? all : tab === "general" ? general : enrollment;
 
@@ -29,9 +30,9 @@ export default function FaqList() {
         </button>
       </div>
       {shown.map((f) => (
-        <details className="accordion" key={f.q}>
-          <summary>{f.q} <span>+</span></summary>
-          <div className="answer">{f.a}</div>
+        <details className="accordion" key={f.id || f.question}>
+          <summary>{f.question} <span>+</span></summary>
+          <div className="answer">{f.answer}</div>
         </details>
       ))}
     </div>

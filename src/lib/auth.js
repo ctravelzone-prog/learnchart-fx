@@ -49,6 +49,9 @@ export async function destroySession() {
 
 // Return the logged-in user (public fields only) or null.
 // A session that expired is deleted and treated as logged out.
+// A DEACTIVATED user (status set by the admin) is treated as logged
+// out too, and their sessions are deleted — deactivation takes effect
+// immediately, even for sessions created before it.
 export async function getSessionUser() {
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value;
@@ -59,7 +62,14 @@ export async function getSessionUser() {
     getDb().prepare("DELETE FROM sessions WHERE token = ?").run(token);
     return null;
   }
-  return getUserById(row.user_id);
+  const user = getUserById(row.user_id);
+  if (!user) return null;
+  const status = getDb().prepare("SELECT status FROM users WHERE id = ?").get(row.user_id)?.status;
+  if (status && status !== "active") {
+    getDb().prepare("DELETE FROM sessions WHERE user_id = ?").run(row.user_id);
+    return null;
+  }
+  return user;
 }
 
 // Create a one-time password-reset token (valid 24h). The token itself

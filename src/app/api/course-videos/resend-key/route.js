@@ -1,23 +1,28 @@
 // ---------------------------------------------------------------------------
 // api/course-videos/resend-key — re-send the student's own Course Key to
 // their own Gmail (Nov 2026 key rule: the key lives in email, never on
-// the site). Only the logged-in student's OWN Forex enrollment can be
-// re-sent, and only to the email on their own account. Never throws:
-// a mail failure redirects back with an honest status instead.
+// the site). GENERALIZED: the course comes from the form (?course=
+// <slug>, default Forex) — only the logged-in student's OWN enrollment
+// for THAT video course can be re-sent, and only to the email on their
+// own account. Never throws: a mail failure redirects back with an
+// honest status instead.
 // ---------------------------------------------------------------------------
 import { redirectTo } from "../../../../lib/http.js";
 import { getDb } from "../../../../lib/db.js";
 import { getSessionUser } from "../../../../lib/auth.js";
-import { getForexEnrollment } from "../../../../lib/access.js";
+import { getVideoEnrollment, SLUGS } from "../../../../lib/access.js";
 import { decryptKey } from "../../../../lib/keys.js";
 import { sendCourseKeyEmail } from "../../../../lib/mail.js";
 
-export async function POST() {
+export async function POST(request) {
   const user = await getSessionUser();
   if (!user) return redirectTo("/login?next=/profile");
 
-  // Only a Forex student has a key at all.
-  const enrollment = getForexEnrollment(user.id);
+  const form = await request.formData();
+  const courseSlug = String(form.get("course") || "") || SLUGS.FOREX;
+
+  // Only a student of this video course has a key at all.
+  const enrollment = getVideoEnrollment(user.id, courseSlug);
   if (!enrollment) return redirectTo("/profile");
   const row = getDb()
     .prepare("SELECT key_encrypted FROM course_keys WHERE enrollment_id = ?")

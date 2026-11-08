@@ -1,10 +1,11 @@
 // ---------------------------------------------------------------------------
 // faq/page.jsx — FAQ page (prompt Section 13). Separate page reached from
 // Home "Learn more", Home FAQ "All FAQs" and footer links. Stats strip
-// reads 11 / 2 / 24/7 / <24h — the real counts from the data.
+// reads the real counts from the database (admin-editable questions).
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import FaqList from "../../components/FaqList.jsx";
+import { getFaqsList } from "../../lib/settings.js";
 
 export const metadata = {
   title: "Frequently Asked Questions — LearnChart FX",
@@ -12,6 +13,7 @@ export const metadata = {
 };
 
 export default function FaqPage() {
+  const faqs = getFaqsList();
   return (
     <div className="wrap section">
       <h1 style={{ fontSize: 40 }}>Frequently Asked Questions</h1>
@@ -21,7 +23,7 @@ export default function FaqPage() {
         <Link href="/contact" className="amber">Contact our support team</Link>
       </p>
 
-      <FaqList />
+      <FaqList items={faqs} />
 
       <div className="card" style={{ marginTop: 28, textAlign: "center" }}>
         <h3>✓ Verified — Still Have Questions?</h3>
@@ -32,7 +34,7 @@ export default function FaqPage() {
       </div>
 
       <div className="stat-strip" style={{ marginTop: 20 }}>
-        <div className="card stat-card"><b>11</b><span className="muted">Total FAQs</span></div>
+        <div className="card stat-card"><b>{faqs.length}</b><span className="muted">Total FAQs</span></div>
         <div className="card stat-card"><b>2</b><span className="muted">Total Categories</span></div>
         <div className="card stat-card"><b>24/7</b><span className="muted">Support Availability</span></div>
         <div className="card stat-card"><b>&lt;24h</b><span className="muted">Response Time</span></div>

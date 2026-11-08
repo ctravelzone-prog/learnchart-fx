@@ -17,10 +17,11 @@ import {
   isTxRefUsed,
   isBep20Configured,
   getBep20Config,
-  coursePriceUsdt,
+  getPayableAmountUsdt,
 } from "../../../../lib/payments.js";
 
 // User-facing wording per failure reason — plain, actionable, no jargon.
+// {amount} is replaced with the admin-configured USDT amount.
 const ERRORS = {
   "bad-format":
     "That does not look like a transaction hash — copy the full TxHash (0x followed by 64 characters) from your wallet or BscScan.",
@@ -35,7 +36,7 @@ const ERRORS = {
   "wrong-recipient":
     "This payment was not sent to our wallet address — check the address and the network (BNB Smart Chain / BEP20 only).",
   "wrong-amount":
-    "The amount in this transaction is not exactly the course price — the Forex Premium Course costs exactly 250 USDT.",
+    "The amount in this transaction is not exactly the course price — the Forex Premium Course costs exactly {amount} USDT.",
   duplicate:
     "This transaction was already used for an enrollment — each payment can only enroll once.",
   "not-configured":
@@ -54,14 +55,18 @@ export async function POST(request) {
   if (hasEnrollment(user.id, slug)) return redirectTo(`/enroll/${slug}/success`);
 
   const back = (reason) =>
-    redirectTo(`/enroll/${slug}?error=${encodeURIComponent(ERRORS[reason] || ERRORS["lookup-failed"])}`);
+    redirectTo(
+      `/enroll/${slug}?error=${encodeURIComponent(
+        (ERRORS[reason] || ERRORS["lookup-failed"]).replace("{amount}", String(getPayableAmountUsdt(course)))
+      )}`
+    );
 
   // BEP20 not connected: honest error, no chain lookup attempted.
   if (!isBep20Configured()) return back("not-configured");
   // Replay guard before any chain lookup.
   if (txHash && isTxRefUsed(txHash)) return back("duplicate");
 
-  const expectedAmount = coursePriceUsdt(course);
+  const expectedAmount = getPayableAmountUsdt(course);
   const result = await verifyBep20Tx({
     txHash,
     expectedAddress: getBep20Config().address,

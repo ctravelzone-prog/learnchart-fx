@@ -1,25 +1,29 @@
 // ---------------------------------------------------------------------------
 // course-videos/page.jsx — Course Videos (prompt Section 11, Nov 2026
-// per-visit key rule). Locked by default: every lesson is locked until
-// the student is logged in + enrolled in the Forex course + has entered
-// their own Course Key FOR THIS VISIT. The key is never shown on the
-// site — it is emailed to the student's Gmail on enrollment. The server
-// decides what renders: the lesson list and embed URLs are NEVER in the
-// page source, API responses or DOM until a valid single-use visit token
-// (?visit=...) is consumed for this visit. Leaving and coming back asks
-// for the key again. Videos are YouTube Unlisted embeds only, lazy-
-// loaded. No video file is ever uploaded to or streamed from this hosting.
+// per-visit key rule). GENERALIZED (Nov 2026): works PER VIDEO COURSE —
+// any course with has_videos = 1, not just Forex. ?course=<slug> picks
+// the course (defaults to the Forex course for backward compatibility);
+// the page lists the student's other video courses as a switcher.
+// Locked by default: every lesson is locked until the student is logged
+// in + enrolled in THAT course + has entered their own Course Key FOR
+// THIS VISIT. The key is never shown on the site — it is emailed to the
+// student's Gmail on enrollment. The server decides what renders: the
+// lesson list and embed URLs are NEVER in the page source, API responses
+// or DOM until a valid single-use visit token (?visit=...) is consumed
+// for this visit. Leaving and coming back asks for the key again.
+// Videos are YouTube Unlisted embeds only, lazy-loaded. No video file
+// is ever uploaded to or streamed from this hosting.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getLessons, getCourseBySlug } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
-import { consumeKeyVisit, getForexEnrollment } from "../../lib/access.js";
+import { consumeKeyVisit, getVideoEnrollment, getVideoEnrollments, SLUGS } from "../../lib/access.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
 import LessonPlayer from "../../components/LessonPlayer.jsx";
 
 export const metadata = {
   title: "Course Videos — LearnChart FX",
-  description: "Forex Trading Premium Course video lessons — unlocked with your personal Course Key.",
+  description: "Video lessons for your enrolled video courses — unlocked with your personal Course Key.",
   robots: { index: false, follow: false },
 };
 
@@ -27,22 +31,32 @@ export default async function CourseVideosPage({ searchParams }) {
   // Next.js 15: searchParams is a Promise — await it first.
   const sp = await searchParams;
   const user = await getSessionUser();
-  const course = getCourseBySlug("forex-premium-course");
+  // Which video course? ?course=<slug> when it names a video course,
+  // otherwise the Forex course (backward compatible default).
+  const requested = typeof sp?.course === "string" ? sp.course : "";
+  const requestedCourse = requested ? getCourseBySlug(requested) : null;
+  const course =
+    requestedCourse && requestedCourse.has_videos
+      ? requestedCourse
+      : getCourseBySlug(SLUGS.FOREX);
   const lessons = course ? getLessons(course.id) : [];
+  const myVideoCourses = user ? getVideoEnrollments(user.id) : [];
+
+  const heading = `${course ? course.title : "Course Videos"} — Video Lessons`;
 
   // Not logged in — locked preview with login/signup.
   if (!user) {
     return (
       <div className="wrap section">
         <p className="muted small">HOME › COURSE VIDEOS</p>
-        <h1 style={{ fontSize: 36 }}>Forex Trading Premium Course — <span className="amber">Video Lessons</span></h1>
+        <h1 style={{ fontSize: 36 }}>{heading}</h1>
         <LockedPreview
           title="🔒 All Course Videos Are Locked"
-          text="Every lesson video on this page is locked. Enroll in the Forex Trading Premium Course and your personal Course Key will be emailed to your Gmail — enter that key here and the whole page unlocks, so you can watch all 10 videos."
-          unlocks="Unlocks with: Forex Trading Premium Course ($250)"
+          text={`Every lesson video on this page is locked. Enroll in the ${course ? course.title : "course"} and your personal Course Key will be emailed to your Gmail — enter that key here and the whole page unlocks, so you can watch all ${lessons.length} videos.`}
+          unlocks={`Unlocks with: ${course ? course.title : "a video course"}${course && course.price_label ? ` (${course.price_label})` : ""}`}
           buttons={[
-            { href: "/login?next=/course-videos", label: "Log In", style: "btn-amber" },
-            { href: "/signup?next=/course-videos", label: "Sign Up", style: "btn-dark" },
+            { href: `/login?next=/course-videos${course ? `?course=${course.slug}` : ""}`, label: "Log In", style: "btn-amber" },
+            { href: `/signup?next=/course-videos${course ? `?course=${course.slug}` : ""}`, label: "Sign Up", style: "btn-dark" },
             { href: "/courses", label: "See Course Details", style: "btn-dark" },
           ]}
         />
@@ -50,27 +64,44 @@ export default async function CourseVideosPage({ searchParams }) {
     );
   }
 
-  const enrollment = getForexEnrollment(user.id);
+  const enrollment = course ? getVideoEnrollment(user.id, course.slug) : null;
   // Per-visit unlock: only a fresh, valid, single-use visit token opens
-  // the lessons for this visit. No token (or a used/expired one) means
-  // locked — the unlock is never remembered.
+  // the lessons for this visit. The token is tied to ONE enrollment —
+  // a token minted for another course never opens this one.
   const visitToken = typeof sp?.visit === "string" ? sp.visit : null;
-  const unlocked = visitToken ? !!consumeKeyVisit(user.id, visitToken) : false;
+  const unlockedEnrollment = visitToken ? consumeKeyVisit(user.id, visitToken) : null;
+  const unlocked = Boolean(unlockedEnrollment && unlockedEnrollment.course_slug === course?.slug);
 
   return (
     <div className="wrap section">
       <p className="muted small">HOME › COURSE VIDEOS</p>
-      <h1 style={{ fontSize: 36 }}>Forex Trading Premium Course — <span className="amber">Video Lessons</span></h1>
+      <h1 style={{ fontSize: 36 }}>{heading}</h1>
       <p className="muted">
-        All 10 lesson videos are hosted on YouTube as <strong>Unlisted</strong> and play here through the embedded
+        All {lessons.length} lesson videos are hosted on YouTube as <strong>Unlisted</strong> and play here through the embedded
         YouTube player. Every video stays locked — enroll in the course, check your Gmail for your personal Course Key,
         enter it here, and this whole page unlocks so you can watch every lesson. The key is asked again every time
         you open this page.
       </p>
 
+      {/* Switcher: the student's other video courses. */}
+      {myVideoCourses.length > 1 ? (
+        <p className="small" style={{ marginBottom: 16 }}>
+          Your video courses:{" "}
+          {myVideoCourses.map((e) => (
+            <span key={e.course_slug} style={{ marginRight: 10 }}>
+              {e.course_slug === course?.slug ? (
+                <strong>{e.course_title}</strong>
+              ) : (
+                <Link href={`/course-videos?course=${e.course_slug}`} className="amber">{e.course_title} →</Link>
+              )}
+            </span>
+          ))}
+        </p>
+      ) : null}
+
       {sp?.error ? <div className="alert alert-error">{sp.error}</div> : null}
       {unlocked ? (
-        <div className="alert alert-ok">🔓 Course videos unlocked for this visit. Your key opened this page — all 10 lessons below are ready to watch. If you leave and come back, enter your key again.</div>
+        <div className="alert alert-ok">🔓 Course videos unlocked for this visit. Your key opened this page — all {lessons.length} lessons below are ready to watch. If you leave and come back, enter your key again.</div>
       ) : null}
       {visitToken && !unlocked ? (
         <div className="alert alert-info">That unlock was for a single visit only — enter your Course Key again below to watch.</div>
@@ -82,10 +113,11 @@ export default async function CourseVideosPage({ searchParams }) {
         <div className="card" style={{ marginBottom: 20 }}>
           <h3>🔑 Enter Your Course Key</h3>
           <p className="muted">
-            You are enrolled in the Forex Trading Premium Course. Enter the Course Key that was emailed to your Gmail
-            to unlock this page and watch all 10 lesson videos.
+            You are enrolled in {course.title}. Enter the Course Key that was emailed to your Gmail
+            to unlock this page and watch all {lessons.length} lesson videos.
           </p>
           <form action="/api/course-videos/unlock" method="post">
+            <input type="hidden" name="course" value={course.slug} />
             <div className="field">
               <label htmlFor="cv-key">Course Key</label>
               <input id="cv-key" name="key" required placeholder="LCFX-XXXX-XXXX-XXXX" autoComplete="off" />
@@ -103,10 +135,10 @@ export default async function CourseVideosPage({ searchParams }) {
       {!enrollment ? (
         <LockedPreview
           title="🔒 All Course Videos Are Locked"
-          text="Every lesson video on this page is locked. Enroll in the Forex Trading Premium Course and your personal Course Key will be emailed to your Gmail — enter that key here and the whole page unlocks, so you can watch all 10 videos."
-          unlocks="Unlocks with: Forex Trading Premium Course ($250)"
+          text={`Every lesson video on this page is locked. Enroll in the ${course ? course.title : "course"} and your personal Course Key will be emailed to your Gmail — enter that key here and the whole page unlocks, so you can watch all ${lessons.length} videos.`}
+          unlocks={`Unlocks with: ${course ? course.title : "a video course"}${course && course.price_label ? ` (${course.price_label})` : ""}`}
           buttons={[
-            { href: "/enroll/forex-premium-course", label: "Enroll Now — Premium Course $250", style: "btn-amber" },
+            { href: `/enroll/${course?.slug || ""}`, label: `Enroll Now — ${course?.title || "Course"}${course?.price_label ? ` ${course.price_label}` : ""}`, style: "btn-amber" },
             { href: "/courses", label: "See Course Details", style: "btn-dark" },
           ]}
         />
@@ -116,7 +148,7 @@ export default async function CourseVideosPage({ searchParams }) {
           this visit. A locked visitor sees nothing of the lessons here. */}
       {unlocked ? (
         <>
-          <h2 style={{ marginTop: 24 }}>🎬 Course Lessons — 10 Videos</h2>
+          <h2 style={{ marginTop: 24 }}>🎬 Course Lessons — {lessons.length} Videos</h2>
           <p className="muted small">
             Videos are streamed from YouTube (Unlisted) — nothing is uploaded to this site. Watch them in order, one lesson at a time.
           </p>

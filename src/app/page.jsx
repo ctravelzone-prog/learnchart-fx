@@ -2,13 +2,24 @@
 // page.jsx — HOME. Exactly the 12 sections of prompt Section 9, in this
 // exact order. Nothing added, nothing removed. (Section 1 = the pill nav
 // in layout.jsx; Section 12 = the footer in layout.jsx.)
-// Courses come from the database; stats/testimonials/socials/brokers are
-// [Placeholder] from config.js — never invented, never copied.
+// Courses, stats, testimonials, socials, brokers and FAQs come from
+// the database (admin-editable in the master admin panel); config.js is
+// only the seed + fallback — never invented, never copied. Page copy
+// (hero, featured, career, brokers, inside, testimonials, FAQ) comes
+// from the page_content table via src/lib/page-content.js (/admin/pages).
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getAllCourses } from "../lib/db.js";
-import { SITE, STATS, SOCIALS, BROKERS, TESTIMONIALS, INSIDE_VIDEO_ID } from "../lib/config.js";
-import { FAQ_HOME_PREVIEW } from "../lib/faq-data.js";
+import { SITE, INSIDE_VIDEO_ID } from "../lib/config.js";
+import {
+  getStats,
+  getSocials,
+  getBrokers,
+  getTestimonials,
+  getFaqsList,
+  getSingleSetting,
+} from "../lib/settings.js";
+import { getPageContent } from "../lib/page-content.js";
 import Countdown from "../components/Countdown.jsx";
 import Testimonials from "../components/Testimonials.jsx";
 import InsideVideoCover from "../components/InsideVideoCover.jsx";
@@ -40,6 +51,24 @@ function SectionTitle({ children, sub }) {
 export default async function HomePage() {
   const courses = getAllCourses();
   const forex = courses.find((c) => c.slug === "forex-premium-course");
+  // Admin-editable content: database first, config.js as the fallback.
+  // (The admin panel edits these; on a fresh database the placeholders
+  // from config.js show until the owner fills in real values.)
+  const stats = getStats();
+  const socials = getSocials();
+  const brokers = getBrokers();
+  const testimonials = getTestimonials();
+  const insideVideoId = getSingleSetting("inside_video_id", INSIDE_VIDEO_ID);
+  // Page copy + pictures: /admin/pages, merged over the defaults.
+  const pc = getPageContent("home");
+  // Next-batch date: editable in Site Settings (default from config).
+  const nextBatchDate = getSingleSetting("next_batch_date", SITE.nextBatchDate);
+  // Home FAQ preview: exactly 7 — General 1–2 + Enrollment 1–5.
+  const faqs = getFaqsList();
+  const faqPreview = [
+    ...faqs.filter((f) => f.category === "General").slice(0, 2),
+    ...faqs.filter((f) => f.category === "Enrollment").slice(0, 5),
+  ].map((f) => ({ q: f.question, a: f.answer }));
 
   return (
     <div>
@@ -47,22 +76,21 @@ export default async function HomePage() {
       <section className="wrap hero">
         <div>
           <h1>
-            The Asia&apos;s First All-in-One Platform For <span className="amber">Professional</span> Trading Education.
+            {pc.hero.title_start} <span className="amber">{pc.hero.title_highlight}</span> {pc.hero.title_end}
           </h1>
           <p>
-            Learn forex trading with a trusted mentor, manage risk with a clear plan,
-            and trade with confidence — step by step, from basics to live markets.
+            {pc.hero.sub}
           </p>
           <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-            <Link href="/courses" className="btn btn-amber">Enroll Now</Link>
-            <Link href="/mentors" className="btn btn-dark">Meet Your Mentors</Link>
+            <Link href="/courses" className="btn btn-amber">{pc.hero.cta_enroll}</Link>
+            <Link href="/mentors" className="btn btn-dark">{pc.hero.cta_mentors}</Link>
           </div>
         </div>
         <div className="card">
-          <span className="badge badge-amber">NEXT BATCH</span>
-          <h3 style={{ marginTop: 12 }}>Starting on January 10</h3>
-          <p className="muted small">The next batch of the Forex Trading Premium Course begins soon. Reserve your seat.</p>
-          <Countdown target={SITE.nextBatchDate} label="Countdown to the next batch" />
+          <span className="badge badge-amber">{pc.hero.batch_badge}</span>
+          <h3 style={{ marginTop: 12 }}>{pc.hero.batch_title}</h3>
+          <p className="muted small">{pc.hero.batch_sub}</p>
+          <Countdown target={nextBatchDate} label={pc.hero.countdown_label} />
         </div>
       </section>
 
@@ -74,36 +102,35 @@ export default async function HomePage() {
           <div className="card">
             <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 14, alignItems: "center" }}>
               <div>
-                <span className="badge badge-amber">Featured</span>
-                <h2 style={{ marginTop: 12 }}>LEARNCHART FX #01</h2>
+                <span className="badge badge-amber">{pc.featured.badge}</span>
+                <h2 style={{ marginTop: 12 }}>{pc.featured.title}</h2>
                 <p className="muted">
-                  Boost your trading skills with LearnChart FX. Learn trading strategies,
-                  expert market analysis, and risk management with a clear plan, every day.
+                  {pc.featured.text}
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link href="/courses" className="btn btn-amber">▶ Join Course</Link>
-                  <Link href="/faq" className="btn btn-dark">Learn more</Link>
+                  <Link href="/courses" className="btn btn-amber">{pc.featured.cta_join}</Link>
+                  <Link href="/faq" className="btn btn-dark">{pc.featured.cta_learn}</Link>
                 </div>
               </div>
               <div className="feat-photo">
-                <img src="/images/mentor-desk.webp" alt="Mentor Siam Chowdhury at his trading desk with candlestick charts on the monitors" />
+                <img src={pc.featured.photo} alt="Mentor Siam Chowdhury at his trading desk with candlestick charts on the monitors" />
               </div>
             </div>
             <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
               <div className="sc-img">
-                <img src="/images/mentor-studio.webp" alt="Trading mindset lesson — mentor teaching trading psychology" loading="lazy" />
-                <span className="dur">1.5 hrs</span>
+                <img src={pc.featured.sc_image} alt="Trading mindset lesson — mentor teaching trading psychology" loading="lazy" />
+                <span className="dur">{pc.featured.sc_duration}</span>
               </div>
-              <span className="chip">9. TRADING MINDSET</span>
+              <span className="chip">{pc.featured.sc_chip}</span>
               <p style={{ margin: "8px 0 0" }}>
-                <strong>Master trading psychology.</strong>{" "}
-                <span className="muted">Manage emotions &amp; discipline. Build mindset, get results.</span>
+                <strong>{pc.featured.sc_title}</strong>{" "}
+                <span className="muted">{pc.featured.sc_text}</span>
               </p>
             </div>
             <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
               <span className="badge">PDF</span>
-              <p style={{ margin: "8px 0" }}><strong>PREMIUM COURSE CURRICULUM</strong></p>
-              <a href="/api/curriculum" className="btn btn-dark btn-sm">DOWNLOAD PDF ⬇</a>
+              <p style={{ margin: "8px 0" }}><strong>{pc.featured.curriculum_label}</strong></p>
+              <a href="/api/curriculum" className="btn btn-dark btn-sm">{pc.featured.curriculum_button}</a>
             </div>
             <div className="feat-strip">
               <div className="fthumb"><img src="/images/mentor-desk.webp" alt="Lesson 1 — starting your trading journey" loading="lazy" /><b>1</b></div>
@@ -113,11 +140,11 @@ export default async function HomePage() {
             </div>
           </div>
           <div className="card">
-            <h3>LEARNCHART FX</h3>
-            <p className="muted">Trading made simple for every learner. Step-by-step lessons with clear guidance. Build confidence and master the market.</p>
+            <h3>{pc.featured.info_title}</h3>
+            <p className="muted">{pc.featured.info_text}</p>
             <div>
-              <span className="chip">10 Lessons</span>
-              <span className="chip">1.5 hrs</span>
+              <span className="chip">{pc.featured.info_chip1}</span>
+              <span className="chip">{pc.featured.info_chip2}</span>
             </div>
             <div style={{ marginTop: 16 }}>
               <div className="lesson-row">
@@ -131,7 +158,7 @@ export default async function HomePage() {
                 <span className="num">2</span>
               </div>
             </div>
-            <p className="small muted">90% — of learners follow the lessons in order, one lesson at a time.</p>
+            <p className="small muted">{pc.featured.strip_note}</p>
           </div>
         </div>
       </section>
@@ -141,7 +168,7 @@ export default async function HomePage() {
       {/* 4 — Stats strip (all [Placeholder]) */}
       <section className="wrap section">
         <div className="stat-strip">
-          {STATS.map((s) => (
+          {stats.map((s) => (
             <div className="card stat-card" key={s.label}>
               <b>{s.value}</b>
               <span className="muted">{s.label}</span>
@@ -154,7 +181,7 @@ export default async function HomePage() {
 
       {/* 5 — Our services (same three cards as the Courses page) */}
       <section className="wrap section">
-        <SectionTitle>Our services</SectionTitle>
+        <SectionTitle>{pc.services.heading}</SectionTitle>
         <div className="grid-3">
           {courses.map((c) => (
             <div className="card" key={c.slug}>
@@ -182,25 +209,24 @@ export default async function HomePage() {
       <section className="wrap section">
         <div className="grid-2">
           <div className="career-photo">
-            <img src="/images/mentor-desk.webp" alt="Siam Chowdhury, head mentor of LearnChart FX" loading="lazy" />
+            <img src={pc.career.photo} alt="Siam Chowdhury, head mentor of LearnChart FX" loading="lazy" />
             <div className="career-bar">
-              <div><b>Siam Chowdhury</b> <span className="muted">&amp; Rex Mizan — your mentors</span></div>
+              <div><b>{pc.career.bar_name}</b> <span className="muted">{pc.career.bar_rest}</span></div>
               <div style={{ marginTop: 10 }}>
-                <span className="chip">FOREX</span><span className="chip">FUTURES</span>
-                <span className="chip">STOCKS</span><span className="chip">OPTIONS</span>
+                {pc.career.tags.split(",").map((t) => (<span className="chip" key={t.trim()}>{t.trim()}</span>))}
               </div>
             </div>
           </div>
           <div>
-            <h2 style={{ fontSize: 32 }}>Build a Successful Trading Career</h2>
+            <h2 style={{ fontSize: 32 }}>{pc.career.heading}</h2>
             <p style={{ fontSize: 20, marginTop: 16 }}>
-              “Consistency is the key to success in trading. Stay disciplined — results will follow.”
+              {pc.career.quote}
             </p>
-            <p className="muted">— LearnChart FX</p>
-            <p className="muted">Start your journey to becoming a professional trader today.</p>
+            <p className="muted">{pc.career.quote_by}</p>
+            <p className="muted">{pc.career.sub}</p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Link href="/courses" className="btn btn-amber">Enroll Now</Link>
-              <Link href="/mentors" className="btn btn-dark">Meet the Mentors</Link>
+              <Link href="/courses" className="btn btn-amber">{pc.career.cta_enroll}</Link>
+              <Link href="/mentors" className="btn btn-dark">{pc.career.cta_mentors}</Link>
             </div>
           </div>
         </div>
@@ -210,12 +236,12 @@ export default async function HomePage() {
 
       {/* 7 — Create Your Trading Account With Confidence (brokers) */}
       <section className="wrap section">
-        <SectionTitle sub="LearnChart FX helps beginners learn forex account setup, broker selection, KYC verification, MetaTrader setup, funding, withdrawals, risk management, and trading psychology step by step. Trading involves risk, so choose regulated brokers and trade with proper risk management.">
-          Create Your Trading Account With Confidence
+        <SectionTitle sub={pc.brokers.sub}>
+          {pc.brokers.heading}
         </SectionTitle>
-        <Link href="/contact" className="btn btn-amber" style={{ marginBottom: 20 }}>Open an Account</Link>
+        <Link href="/contact" className="btn btn-amber" style={{ marginBottom: 20 }}>{pc.brokers.cta}</Link>
         <div className="grid-4">
-          {BROKERS.map((b, i) => (
+          {brokers.map((b, i) => (
             <div className="card center" key={i}>
               <div className="avatar" style={{ margin: "0 auto 10px" }}>B{i + 1}</div>
               <strong>{b.name}</strong>
@@ -231,9 +257,9 @@ export default async function HomePage() {
 
       {/* 8 — Connect With Us */}
       <section className="wrap section">
-        <SectionTitle>CONNECT WITH US</SectionTitle>
+        <SectionTitle>{pc.connect.heading}</SectionTitle>
         <div className="grid-6">
-          {SOCIALS.map((s) => (
+          {socials.map((s) => (
             <div className="card" key={s.platform}>
               <h3 style={{ fontSize: 18 }}>{s.platform}</h3>
               <p className="muted small">{s.handle}</p>
@@ -249,14 +275,14 @@ export default async function HomePage() {
 
       {/* 9 — Inside LearnChart FX */}
       <section className="wrap section">
-        <SectionTitle>&ldquo;Inside LearnChart FX&rdquo;</SectionTitle>
+        <SectionTitle>{pc.inside.heading}</SectionTitle>
         <div className="card">
-          {INSIDE_VIDEO_ID === "[Placeholder]" ? (
+          {insideVideoId === "[Placeholder]" ? (
             <InsideVideoCover />
           ) : (
             <div className="video-wrap">
               <iframe
-                src={`https://www.youtube-nocookie.com/embed/${INSIDE_VIDEO_ID}`}
+                src={`https://www.youtube-nocookie.com/embed/${insideVideoId}`}
                 title="Inside LearnChart FX"
                 loading="lazy"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -265,9 +291,7 @@ export default async function HomePage() {
             </div>
           )}
           <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span className="chip">✓ Personalised Experience</span>
-            <span className="chip">✓ Multiple Topics &amp; Classes</span>
-            <span className="chip">✓ Proven Profitable Strategies</span>
+            {pc.inside.chips.split(",").map((chip) => (<span className="chip" key={chip.trim()}>{chip.trim()}</span>))}
           </div>
         </div>
       </section>
@@ -276,26 +300,26 @@ export default async function HomePage() {
 
       {/* 10 — Trusted By Successful Students */}
       <section className="wrap section">
-        <SectionTitle sub="99% — Of Students Were Served Successfully">
-          Trusted By Successful Students
+        <SectionTitle sub={pc.testimonials.sub}>
+          {pc.testimonials.heading}
         </SectionTitle>
-        <Testimonials items={TESTIMONIALS} />
+        <Testimonials items={testimonials} />
       </section>
 
       <div className="dots" />
 
       {/* 11 — FAQ preview (exactly the 7 questions of Section 13) */}
       <section className="wrap section">
-        <SectionTitle>Frequently Asked Questions</SectionTitle>
-        {FAQ_HOME_PREVIEW.map((f) => (
+        <SectionTitle>{pc.faq.heading}</SectionTitle>
+        {faqPreview.map((f) => (
           <details className="accordion" key={f.q}>
             <summary>{f.q} <span>+</span></summary>
             <div className="answer">{f.a}</div>
           </details>
         ))}
         <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
-          <Link href="/faq" className="btn btn-dark">All FAQs →</Link>
-          <Link href="/courses" className="btn btn-amber">Enroll Now →</Link>
+          <Link href="/faq" className="btn btn-dark">{pc.faq.cta_all}</Link>
+          <Link href="/courses" className="btn btn-amber">{pc.faq.cta_enroll}</Link>
         </div>
       </section>
       {/* 12 — Footer lives in layout.jsx */}

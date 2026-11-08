@@ -4,7 +4,8 @@
 // checked here on purpose. Photos/bios/tags are [Placeholder]; no profit
 // claims, earnings figures or win-rate numbers for either mentor.
 // ---------------------------------------------------------------------------
-import { MENTORS } from "../../lib/config.js";
+import { getMentorsList } from "../../lib/settings.js";
+import { getPageContent } from "../../lib/page-content.js";
 
 export const metadata = {
   title: "Mentors — LearnChart FX",
@@ -12,20 +13,24 @@ export const metadata = {
 };
 
 export default function MentorsPage() {
+  // Mentor content is admin-editable (database first, config fallback).
+  const mentors = getMentorsList();
+  // Page heading + intro: /admin/pages, merged over the defaults.
+  const pc = getPageContent("mentors");
   return (
     <div className="wrap section">
       <p className="muted small">HOME › MENTORS</p>
       <h1 style={{ fontSize: 40 }}>
-        Meet Your <span className="amber">Mentors</span>
+        {pc.main.heading_start} <span className="amber">{pc.main.heading_highlight}</span>
       </h1>
-      <p className="muted">The two traders who teach the course, run the live room and answer you in the community.</p>
-      <p><span className="badge badge-green">🔓 Open to everyone</span></p>
+      <p className="muted">{pc.main.intro}</p>
+      <p><span className="badge badge-green">{pc.main.open_badge}</span></p>
       <p className="muted small">
-        This Mentors section is public — any visitor can read it, with no purchase, enrollment or login needed.
+        {pc.main.open_note}
       </p>
 
       <div className="grid-2" style={{ marginTop: 24 }}>
-        {MENTORS.map((m) => (
+        {mentors.map((m) => (
           <div className="card" key={m.id}>
             <span className="badge badge-amber">{m.badge}</span>
             {/* Mentor photo: a DESIGN STAND-IN from the UI/UX design file
