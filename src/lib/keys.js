@@ -48,6 +48,19 @@ export function decryptKey(encrypted) {
   return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
 }
 
+// --- Single-visit tokens (Nov 2026 per-visit key rule) -------------------
+// A visit token is a random secret handed to the browser in the URL once
+// (?visit=<token>) and consumed on first use. Only its SHA-256 hash is
+// stored (key_visits table), so a leaked database row cannot unlock
+// anything. Tokens expire 15 minutes after creation.
+export function generateVisitToken() {
+  return crypto.randomBytes(24).toString("base64url");
+}
+
+export function hashVisitToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 // Check an entered key against a stored hash. Timing-safe.
 export function verifyKey(entered, storedHash) {
   const test = hashKey(entered.trim().toUpperCase());

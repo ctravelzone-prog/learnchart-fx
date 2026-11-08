@@ -1,20 +1,22 @@
 // ---------------------------------------------------------------------------
 // enroll/[slug]/success — enrollment confirmation screen (prompt Sec 15).
-// Shows what was unlocked. For the Forex course this is ALSO where the
-// student's unique Course Key is first shown — decrypted from the DB for
-// the owner only, with a clear instruction to save it. Nobody else can
-// open this page and see another student's key (server checks ownership).
+// Shows what was unlocked. For the Forex course the student's unique
+// Course Key is EMAILED to their Gmail (Nov 2026 key rule) — the key is
+// NEVER shown on this page, on the profile, or anywhere else on the
+// site. If email is not connected yet, the page says so honestly.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getDb, getCourseBySlug, hasEnrollment } from "../../../../lib/db.js";
+import { getCourseBySlug, hasEnrollment } from "../../../../lib/db.js";
 import { getSessionUser } from "../../../../lib/auth.js";
-import { decryptKey } from "../../../../lib/keys.js";
+import { isMailConfigured } from "../../../../lib/mail.js";
 
 export const metadata = { title: "Enrollment Confirmed — LearnChart FX", description: "Your LearnChart FX enrollment is confirmed." };
 
-export default async function EnrollSuccessPage({ params }) {
+export default async function EnrollSuccessPage({ params, searchParams }) {
+  // Next.js 15: params + searchParams are Promises — await them first.
   const { slug } = await params;
+  const sp = await searchParams;
   const course = getCourseBySlug(slug);
   if (!course) redirect("/courses");
 
@@ -22,24 +24,16 @@ export default async function EnrollSuccessPage({ params }) {
   if (!user) redirect(`/login?next=/enroll/${slug}`);
   if (!hasEnrollment(user.id, slug)) redirect(`/enroll/${slug}`);
 
-  // The owner's own Course Key (Forex only), decrypted for display.
-  let myKey = null;
-  if (slug === "forex-premium-course") {
-    const row = getDb()
-      .prepare(
-        `SELECT ck.key_encrypted FROM course_keys ck
-         JOIN enrollments e ON e.id = ck.enrollment_id
-         WHERE e.user_id = ? AND e.course_id = ?`
-      )
-      .get(user.id, course.id);
-    if (row) myKey = decryptKey(row.key_encrypted);
-  }
-
   const unlocked = [];
   unlocked.push("Community — Premium Live Trade Everyday");
   if (slug === "premium-live-trade-support") unlocked.push("Live Room");
   if (slug === "trading-consultation") unlocked.push("Trading Consultation area");
-  if (slug === "forex-premium-course") unlocked.push("Course Videos (after you enter your Course Key below)");
+  if (slug === "forex-premium-course") unlocked.push("Course Videos (after you enter your Course Key — emailed to your Gmail)");
+
+  // How the key email went (set by /api/enroll; absent on a direct visit).
+  // "sent" = emailed. "failed" = SMTP tried and failed. "unconfigured" =
+  // no email service connected yet. No param = fall back to config state.
+  const keymail = sp?.keymail || (slug === "forex-premium-course" ? (isMailConfigured() ? "sent" : "unconfigured") : null);
 
   return (
     <div className="wrap section">
@@ -54,17 +48,25 @@ export default async function EnrollSuccessPage({ params }) {
           {unlocked.map((u) => (<li key={u}>{u}</li>))}
         </ul>
 
-        {myKey ? (
-          <>
-            <div className="alert alert-info">
-              <strong>Your personal Course Key</strong> — save it now. You will need it to unlock the Course Videos page.
-              Every student&apos;s key is different. Never share it.
-            </div>
-            <div className="key-box">{myKey}</div>
-            <p className="small muted center" style={{ marginTop: 10 }}>
-              This key is also saved in your profile (My Enrollments) — only you can see it.
-            </p>
-          </>
+        {slug === "forex-premium-course" && keymail === "sent" ? (
+          <div className="alert alert-ok">
+            <strong>Your Course Key was emailed to {user.email}.</strong> Check your Gmail inbox (and Spam folder)
+            — enter that key on the Course Videos page to watch all 10 lessons. You will be asked for the key every
+            time you open the page, so keep the email safe. Every student&apos;s key is different. Never share it.
+          </div>
+        ) : null}
+        {slug === "forex-premium-course" && keymail === "failed" ? (
+          <div className="alert alert-error">
+            <strong>We could not send your Course Key email right now.</strong> Your enrollment is complete — use
+            &ldquo;Resend my key&rdquo; on your profile to have the key emailed to {user.email} again.
+          </div>
+        ) : null}
+        {slug === "forex-premium-course" && keymail === "unconfigured" ? (
+          <div className="alert alert-info">
+            <strong>Email service is not connected yet.</strong> Your Course Key will be emailed to {user.email} once
+            the site owner connects email. Your enrollment is complete — the Course Videos page will stay locked until
+            then.
+          </div>
         ) : null}
 
         <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>

@@ -57,7 +57,7 @@ export default function LessonPlayer({ title, position, youtubeId, unlocked }) {
       </div>
       {state === "note" && !unlocked ? (
         <p className="muted small" style={{ marginTop: -8, marginBottom: 20 }}>
-          🔒 Locked — enroll in the Forex Trading Premium Course and enter your Course Key to watch.
+          🔒 Locked — enroll in the Forex Trading Premium Course and enter the Course Key emailed to your Gmail to watch.
         </p>
       ) : null}
       {state === "note" && unlocked && !youtubeId ? (

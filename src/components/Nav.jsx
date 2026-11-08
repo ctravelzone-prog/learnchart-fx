@@ -24,6 +24,7 @@ export default async function Nav({ active }) {
           {link("/", "Home")}
           {link("/courses", "Courses & Services")}
           {link("/contact", "Contact Us")}
+          {user ? link("/chat", "Chat") : null}
         </div>
         <div className="nav-right">
           {user ? (

@@ -101,10 +101,30 @@ CREATE TABLE IF NOT EXISTS course_keys (
 
 -- Remembering that a student unlocked the videos page, so they do not
 -- re-enter the key on every visit. Checked server-side every time.
+-- (UNUSED since the Nov 2026 per-visit key rule: the key must be entered
+-- on EVERY visit, so no unlock is remembered. The table stays so old
+-- databases keep working, but nothing reads it anymore.)
 CREATE TABLE IF NOT EXISTS video_unlocks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   enrollment_id INTEGER NOT NULL UNIQUE REFERENCES enrollments(id) ON DELETE CASCADE,
   unlocked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- One single-visit unlock for the Course Videos page (Nov 2026 rule:
+-- the key is asked on EVERY visit). When a student enters a correct key,
+-- the server creates one random visit token here; opening
+-- /course-videos?visit=<token> consumes it (used = 1) and shows the
+-- lessons for that visit only. Leaving and coming back needs a fresh
+-- key entry. Only a SHA-256 hash of the token is stored — the plain
+-- token is never in the database.
+CREATE TABLE IF NOT EXISTS key_visits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_hash TEXT NOT NULL UNIQUE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  enrollment_id INTEGER NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS lessons (

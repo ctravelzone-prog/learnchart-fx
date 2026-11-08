@@ -5,6 +5,7 @@
 // hiding a button is not security, and a direct URL is blocked too.
 // ---------------------------------------------------------------------------
 import { getDb, hasEnrollment } from "./db.js";
+import { generateVisitToken, hashVisitToken } from "./keys.js";
 
 export const SLUGS = {
   FOREX: "forex-premium-course",
@@ -33,19 +34,42 @@ export function canEnterConsultation(userId) {
   return hasEnrollment(userId, SLUGS.CONSULT);
 }
 
-// Course Videos: Forex course enrollment AND a valid Course Key unlock
-// (the unlock is remembered per enrollment, checked server-side).
-export function canWatchCourseVideos(userId) {
-  if (!hasEnrollment(userId, SLUGS.FOREX)) return false;
+// Course Videos: Forex course enrollment AND a key verified for THIS
+// visit. Since Nov 2026 the unlock is NOT remembered: the student enters
+// their key on every visit, the server mints one single-use visit token,
+// and opening /course-videos?visit=<token> consumes it. Navigating away
+// and coming back asks for the key again. The old video_unlocks table
+// is never read anymore.
+export function consumeKeyVisit(userId, token) {
+  if (!userId || !token) return null;
+  const enrollment = getForexEnrollment(userId);
+  if (!enrollment) return null;
   const row = getDb()
     .prepare(
-      `SELECT vu.id FROM video_unlocks vu
-       JOIN enrollments e ON e.id = vu.enrollment_id
-       JOIN courses_services c ON c.id = e.course_id
-       WHERE e.user_id = ? AND c.slug = ? AND e.status = 'active'`
+      `SELECT id FROM key_visits
+       WHERE token_hash = ? AND user_id = ? AND enrollment_id = ?
+         AND used = 0 AND expires_at > datetime('now')`
     )
-    .get(userId, SLUGS.FOREX);
-  return !!row;
+    .get(hashVisitToken(token), userId, enrollment.id);
+  if (!row) return null;
+  // Single use: mark consumed so the same URL can never unlock again.
+  getDb().prepare("UPDATE key_visits SET used = 1 WHERE id = ?").run(row.id);
+  return enrollment;
+}
+
+// Mint one single-visit token for this user's Forex enrollment.
+// Returns the plain token (shown only in the redirect URL, once).
+export function createKeyVisit(userId) {
+  const enrollment = getForexEnrollment(userId);
+  if (!enrollment) return null;
+  const token = generateVisitToken();
+  getDb()
+    .prepare(
+      `INSERT INTO key_visits (token_hash, user_id, enrollment_id, expires_at)
+       VALUES (?, ?, ?, datetime('now', '+15 minutes'))`
+    )
+    .run(hashVisitToken(token), userId, enrollment.id);
+  return token;
 }
 
 // Return the active Forex enrollment for a user (or null).

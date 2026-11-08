@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "LearnChart FX — forex trading education platform (Phase 1: user side only)",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,6 +13,7 @@
   },
   "dependencies": {
     "next": "^15.1.0",
+    "nodemailer": "^10.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sharp": "^0.33.5"

@@ -1,20 +1,42 @@
 // ---------------------------------------------------------------------------
 // profile/page.jsx — My Profile (prompt Section 15). Login required.
 // Shows details, uploadable profile picture, My Enrollments, a My Course
-// Videos link for Forex students, and — for a Forex student — their own
-// Course Key, visible only to them. Gated page: noindex.
+// Videos link for Forex students, and My Posts / My Uploads (the user's
+// own community posts). The Course Key is NEVER shown here — since Nov
+// 2026 it is emailed to the student's Gmail; a Forex student can ask
+// for it to be re-sent from here. Gated page: noindex.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDb, getEnrollments, hasEnrollment } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
-import { decryptKey } from "../../lib/keys.js";
+import PostCard from "../../components/PostCard.jsx";
 
 export const metadata = {
   title: "My Profile — LearnChart FX",
   description: "Your LearnChart FX profile and enrollments.",
   robots: { index: false, follow: false },
 };
+
+// The user's own posts, newest first, with like count + comments.
+// Plain objects only (see PostCard) — node:sqlite rows are spread into
+// fresh plain objects before rendering.
+function getMyPosts(userId) {
+  const db = getDb();
+  return db
+    .prepare("SELECT * FROM posts WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 50")
+    .all(userId)
+    .map((p) => ({
+      ...p,
+      likes: db.prepare("SELECT COUNT(*) AS c FROM likes WHERE post_id = ?").get(p.id).c,
+      comments: db
+        .prepare(
+          `SELECT c.*, u.name AS author_name FROM comments c
+           JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC`
+        )
+        .all(p.id),
+    }));
+}
 
 export default async function ProfilePage({ searchParams }) {
   // Next.js 15: searchParams is a Promise — await it first.
@@ -24,23 +46,15 @@ export default async function ProfilePage({ searchParams }) {
 
   const enrollments = getEnrollments(user.id);
   const isForex = hasEnrollment(user.id, "forex-premium-course");
-  let myKey = null;
-  if (isForex) {
-    const row = getDb()
-      .prepare(
-        `SELECT ck.key_encrypted FROM course_keys ck
-         JOIN enrollments e ON e.id = ck.enrollment_id
-         JOIN courses_services c ON c.id = e.course_id
-         WHERE e.user_id = ? AND c.slug = 'forex-premium-course'`
-      )
-      .get(user.id);
-    if (row) myKey = decryptKey(row.key_encrypted);
-  }
+  const myPosts = getMyPosts(user.id);
 
   return (
     <div className="wrap section">
       <h1 style={{ fontSize: 36 }}>My Profile</h1>
       {sp?.saved === "1" ? <div className="alert alert-ok">Profile picture updated.</div> : null}
+      {sp?.keymail === "resent" ? <div className="alert alert-ok">Your Course Key was emailed to {user.email} — check your Gmail inbox (and Spam folder).</div> : null}
+      {sp?.keymail === "failed" ? <div className="alert alert-error">We could not send your Course Key email right now. Please try again in a little while.</div> : null}
+      {sp?.keymail === "unconfigured" ? <div className="alert alert-info">Email service is not connected yet — your key will be emailed once the site owner connects email.</div> : null}
       {sp?.error ? <div className="alert alert-error">{sp.error}</div> : null}
 
       <div className="grid-2">
@@ -77,12 +91,18 @@ export default async function ProfilePage({ searchParams }) {
                 <p className="small muted" style={{ margin: "4px 0" }}>
                   Status: {e.status} · Enrolled {new Date(e.created_at).toLocaleDateString("en-GB")}
                 </p>
-                {e.course_slug === "forex-premium-course" && myKey ? (
+                {e.course_slug === "forex-premium-course" ? (
                   <>
-                    <p className="small"><strong>Your Course Key:</strong></p>
-                    <div className="key-box" style={{ fontSize: 16 }}>{myKey}</div>
-                    <p className="small muted">Enter this key on the Course Videos page to unlock all 10 lessons. Never share it.</p>
-                    <Link href="/course-videos" className="btn btn-amber btn-sm">My Course Videos →</Link>
+                    <p className="small muted">
+                      Your Course Key was emailed to your Gmail when you enrolled. Enter it on the Course Videos
+                      page — it is asked again every time you open the page.
+                    </p>
+                    <form action="/api/course-videos/resend-key" method="post" style={{ marginTop: 8 }}>
+                      <button type="submit" className="btn btn-dark btn-sm">Resend my key to my Gmail</button>
+                    </form>
+                    <p style={{ marginTop: 10 }}>
+                      <Link href="/course-videos" className="btn btn-amber btn-sm">My Course Videos →</Link>
+                    </p>
                   </>
                 ) : null}
               </div>
@@ -95,6 +115,15 @@ export default async function ProfilePage({ searchParams }) {
           </div>
         </div>
       </div>
+
+      {/* My Posts / My Uploads — everything this user posted in the Community. */}
+      <h2 style={{ marginTop: 32 }}>📤 My Posts / My Uploads</h2>
+      {myPosts.length === 0 ? (
+        <div className="card"><p className="muted">You have not posted anything yet. <Link href="/community" className="amber">Write your first post in the Community →</Link></p></div>
+      ) : null}
+      {myPosts.map((p) => (
+        <PostCard key={p.id} post={p} authorName={user.name} authorPic={user.profile_pic} authorId={user.id} />
+      ))}
     </div>
   );
 }

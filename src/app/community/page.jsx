@@ -3,8 +3,12 @@
 // ONE shared community for every member. Gate (server-side, via
 // access.js): any enrollment unlocks it; everyone else sees the locked
 // preview naming exactly which enrollments unlock it.
-// Inside: Facebook-style feed (newest first), composer, member list +
-// member chat, and the separate Mentor Special Chat. Gated: noindex.
+// Inside: Facebook-style feed (newest first), composer, and the separate
+// Mentor Special Chat. Member-to-member chat lives on its own page
+// (/chat) — linked from here, not buried in the sidebar. Author names
+// and pictures link to member profile pages (/members/[id]).
+// Layout: feed is the main column on desktop; one column on phones.
+// Gated: noindex.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getDb } from "../../lib/db.js";
@@ -13,7 +17,7 @@ import { canEnterCommunity } from "../../lib/access.js";
 import { timeAgo } from "../../lib/utils.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
 import DrivePlayer from "../../components/DrivePlayer.jsx";
-import { SpecialChat, MemberChat } from "../../components/CommunityClient.jsx";
+import { SpecialChat } from "../../components/CommunityClient.jsx";
 
 export const metadata = {
   title: "Community — Premium Live Trade Everyday — LearnChart FX",
@@ -25,7 +29,7 @@ function getFeed(userId) {
   const db = getDb();
   const posts = db
     .prepare(
-      `SELECT p.*, u.name AS author_name, u.profile_pic AS author_pic
+      `SELECT p.*, u.id AS author_id, u.name AS author_name, u.profile_pic AS author_pic
        FROM posts p JOIN users u ON u.id = p.user_id
        ORDER BY p.created_at DESC, p.id DESC LIMIT 50`
     )
@@ -71,13 +75,6 @@ export default async function CommunityPage({ searchParams }) {
   }
 
   const feed = getFeed(user.id);
-  // node:sqlite returns rows as null-prototype objects, and React's
-  // flight serializer refuses those as props for a Client Component
-  // (MemberChat below) — so map them to plain objects first.
-  const members = getDb()
-    .prepare("SELECT id, name, profile_pic FROM users WHERE id != ? ORDER BY created_at ASC LIMIT 50")
-    .all(user.id)
-    .map((m) => ({ id: m.id, name: m.name, profile_pic: m.profile_pic }));
 
   return (
     <div className="wrap section">
@@ -92,7 +89,12 @@ export default async function CommunityPage({ searchParams }) {
       {sp?.error ? <div className="alert alert-error">{sp.error}</div> : null}
       {sp?.posted === "1" ? <div className="alert alert-ok">Your post is live in the feed.</div> : null}
 
-      <div className="grid-2" style={{ gridTemplateColumns: "1.5fr 1fr", alignItems: "start" }}>
+      {/* Facebook-style layout: the feed is the main column; the sidebar
+          stacks BELOW it on phones (one column) so no card is ever
+          squeezed into a one-word-per-line strip. The old inline
+          gridTemplateColumns overrode the mobile media query — that was
+          the squeeze bug in Siam's screenshot. */}
+      <div className="community-layout">
         <div>
           {/* Composer — post rules (Section 17) explained before posting. */}
           <div className="card composer">
@@ -135,11 +137,15 @@ export default async function CommunityPage({ searchParams }) {
           {feed.map((p) => (
             <article className="card post" key={p.id}>
               <div className="post-head">
-                <span className="avatar">
-                  {p.author_pic ? <img src={p.author_pic} alt={p.author_name} /> : p.author_name[0]}
-                </span>
+                {/* Author name + picture link to their profile page, where
+                    their own posts/uploads live. */}
+                <Link href={`/members/${p.author_id}`} aria-label={`${p.author_name}'s profile`}>
+                  <span className="avatar">
+                    {p.author_pic ? <img src={p.author_pic} alt={p.author_name} /> : p.author_name[0]}
+                  </span>
+                </Link>
                 <div>
-                  <strong>{p.author_name}</strong>
+                  <Link href={`/members/${p.author_id}`}><strong>{p.author_name}</strong></Link>
                   <div className="small muted">{timeAgo(p.created_at)}</div>
                 </div>
               </div>
@@ -182,8 +188,10 @@ export default async function CommunityPage({ searchParams }) {
           </div>
           <div className="card" style={{ marginBottom: 16 }}>
             <h3>💬 Member Chat</h3>
-            <p className="small muted">Tap a member to chat one-to-one.</p>
-            <MemberChat members={members} meId={user.id} />
+            <p className="small muted">
+              Chat one-to-one with other members in a separate chat box — pick a member and talk.
+            </p>
+            <Link href="/chat" className="btn btn-amber btn-sm">Open Chat →</Link>
           </div>
           <div className="card">
             <h3>Quick links</h3>
