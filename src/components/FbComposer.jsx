@@ -27,6 +27,18 @@
 // on /profile with identical behavior. Both steps live inside ONE
 // form (the edit step is hidden, not unmounted, on confirm — so the
 // chosen photo and text are still in the form when Post submits).
+// THE GATE LIVES IN THE MODAL (Nov 2026 fix): the composer bar shows
+// on /profile for EVERY signed-in user — Siam ordered it there with
+// no exception for free users — but the modal enforces the paid-only
+// Community gate at post time. canPost=false (no active paid
+// enrollment — Forex $250 or unexpired Private Live Trade $200/month)
+// shows the paid-member lock inside the modal instead of the compose
+// form: "Posting to the Community is for paid members" + buttons to
+// Courses (and Renew, when a subscription lapsed) + Close. Posting is
+// refused server-side too (/api/community/posts — canEnterCommunity),
+// so the modal lock is never the only check. On /community the
+// composer only renders for paid users, so canPost defaults to true
+// and that call site needs no change.
 // ---------------------------------------------------------------------------
 "use client";
 
@@ -42,7 +54,17 @@ const EMOJIS = [
   "❤️", "💛", "💚", "💙", "🎉", "🙌", "👀", "💡",
 ];
 
-export default function FbComposer({ me, returnTo }) {
+// SQLite stores datetimes as UTC "YYYY-MM-DD HH:MM:SS" — parse as UTC
+// so the expiry day shown is the real one, not a day off.
+function fmtSqlite(s) {
+  return new Date(String(s).replace(" ", "T") + "Z").toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export default function FbComposer({ me, returnTo, canPost = true, accessState = { state: "open" } }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("edit"); // 'edit' | 'confirm'
   const [text, setText] = useState("");
@@ -156,6 +178,41 @@ export default function FbComposer({ me, returnTo }) {
               <button type="button" className="fb-modal-close" onClick={closeModal} aria-label="Close">✕</button>
             </div>
 
+            {/* PAID-MEMBER LOCK (the gate at post time): the composer bar
+                shows for every signed-in user, but a user with no active
+                paid enrollment gets this lock inside the modal instead of
+                the compose form — "Posting to the Community is for paid
+                members" + Courses/Renew + Close. A lapsed subscription
+                names its expiry date and offers Renew, like every other
+                Community locked preview. The server refuses the post
+                too, so this is never the only check. */}
+            {!canPost ? (
+              <div className="fb-modal-lock" style={{ textAlign: "center", padding: "8px 4px 4px" }}>
+                <p style={{ fontSize: 40, margin: "4px 0" }}>🔒</p>
+                <h3 style={{ margin: "0 0 8px" }}>Posting to the Community is for paid members</h3>
+                {accessState?.state === "expired" ? (
+                  <p className="muted">
+                    Your {accessState.courseTitle || "Private Live Trade"} subscription expired on{" "}
+                    <strong>{fmtSqlite(accessState.expiredAt)}</strong> — your Community access stopped with it.
+                    Renew to post again.
+                  </p>
+                ) : (
+                  <p className="muted">
+                    Only paid members can post in the Community: Forex Trading Premium ($250) or Private Live
+                    Trade ($200/month). A Trading Consultation enrollment opens only the Consultation area.
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap", justifyContent: "center" }}>
+                  {accessState?.state === "expired" ? (
+                    <Link href={`/enroll/${accessState.courseSlug || "private-live-trade"}`} className="btn btn-amber">
+                      Renew — Private Live Trade $200/month →
+                    </Link>
+                  ) : null}
+                  <Link href="/courses" className="btn btn-amber">Explore plans →</Link>
+                  <button type="button" className="btn btn-dark" onClick={closeModal}>Close</button>
+                </div>
+              </div>
+            ) : (
             <form action="/api/community/posts" method="post" encType="multipart/form-data">
               <input type="hidden" name="bg_color" value={bgColor === "none" ? "" : bgColor} />
               <input type="hidden" name="return_to" value={returnTo === "/profile" ? "/profile" : "/community"} />
@@ -311,6 +368,7 @@ export default function FbComposer({ me, returnTo }) {
                 </div>
               </div>
             </form>
+            )}
           </div>
         </div>
       ) : null}

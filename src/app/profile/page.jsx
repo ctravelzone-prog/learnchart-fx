@@ -10,7 +10,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDb, getEnrollments, isEnrollmentActive, displayPrice } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
-import { canEnterCommunity } from "../../lib/access.js";
+import { canEnterCommunity, getCommunityAccessState } from "../../lib/access.js";
 import PostCard from "../../components/PostCard.jsx";
 import FbComposer from "../../components/FbComposer.jsx";
 
@@ -48,10 +48,16 @@ export default async function ProfilePage({ searchParams }) {
 
   const enrollments = getEnrollments(user.id);
   const myPosts = getMyPosts(user.id);
-  // The composer only shows for members who can actually post (an
-  // active PAID enrollment — Nov 2026 paid-only Community gate). A
-  // free Consultation enrollment alone never sees a dead composer.
+  // The composer shows for EVERY signed-in user on the profile (Siam's
+  // order — "profile er vitoreo thakbe", no exception for free users).
+  // The paid gate is enforced INSIDE the modal at post time, not by
+  // hiding the composer: a Consultation-only user sees the bar, taps
+  // it, and the modal shows the paid-member lock instead of the
+  // compose form. Posting is refused server-side too (see
+  // /api/community/posts — canEnterCommunity). The /community page
+  // itself stays fully locked for non-paid users.
   const canPost = canEnterCommunity(user.id);
+  const communityAccess = getCommunityAccessState(user.id);
 
   // What this student can actually open right now (active, unexpired
   // enrollments only) — the quick links below show only real access.
@@ -195,8 +201,15 @@ export default async function ProfilePage({ searchParams }) {
 
       {/* The same Facebook composer as the Community feed (Nov 2026):
           posting from here returns to /profile with the new post at
-          the top of your own posts. Only paid members see it. */}
-      {canPost ? <FbComposer me={{ id: user.id, name: user.name, profile_pic: user.profile_pic }} returnTo="/profile" /> : null}
+          the top of your own posts. It shows for EVERY signed-in user
+          — the paid gate lives inside the modal (and server-side), not
+          by hiding the composer. */}
+      <FbComposer
+        me={{ id: user.id, name: user.name, profile_pic: user.profile_pic }}
+        returnTo="/profile"
+        canPost={canPost}
+        accessState={communityAccess}
+      />
 
       {/* My Posts / My Uploads — everything this user posted in the Community. */}
       <h2 style={{ marginTop: 32 }}>📤 My Posts / My Uploads</h2>
