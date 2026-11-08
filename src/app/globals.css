@@ -425,10 +425,12 @@ h1, h2, h3, h4 { font-family: "Poppins", system-ui, sans-serif; line-height: 1.1
 .ig-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .ig-top h1 { font-size: 24px; }
 /* Stories row — circular avatars with an amber gradient ring, real
-   members with recent posts only. Tap opens the member's profile. */
+   24-hour stories only (members with no live story get no circle).
+   Tap a circle opens the story viewer. */
 .ig-stories { display: flex; gap: 14px; overflow-x: auto; padding: 6px 2px 14px; scrollbar-width: none; }
 .ig-stories::-webkit-scrollbar { display: none; }
 .ig-story { flex-shrink: 0; width: 66px; text-align: center; }
+button.ig-story { background: none; border: none; padding: 0; cursor: pointer; font: inherit; }
 .ig-story-ring {
   width: 64px; height: 64px; border-radius: 50%; margin: 0 auto; padding: 3px; position: relative;
   background: linear-gradient(45deg, var(--amber), var(--amber2), #ff6b35);
@@ -454,6 +456,49 @@ h1, h2, h3, h4 { font-family: "Poppins", system-ui, sans-serif; line-height: 1.1
 .ig-photo-pick b { display: block; color: var(--ink); font-size: 15px; }
 .ig-photo-preview { border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
 .ig-photo-preview img { width: 100%; max-height: 420px; object-fit: cover; }
+/* Collapsed composer bar (Nov 2026) — Instagram/Facebook style: own
+   avatar + "Create a post…" placeholder + photo icon. Tapping opens
+   the dedicated Create page; the big open card is gone from the feed. */
+.ig-composer-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  padding: 8px 16px 8px 8px; margin-bottom: 24px; cursor: pointer;
+}
+.ig-composer-bar:hover { border-color: var(--amber); }
+.ig-composer-bar .avatar { width: 32px; height: 32px; font-size: 13px; }
+.ig-composer-bar-text { flex: 1; color: var(--muted); font-size: 15px; }
+.ig-composer-bar-photo { font-size: 20px; }
+/* Story picker previews — small square thumbnails of the chosen files. */
+.ig-story-previews { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.ig-story-previews img { width: 72px; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+/* Story viewer — full-screen overlay, Instagram style: progress bars,
+   author + time left + close on top, photo centered, tap zones left /
+   right to step. */
+.ig-viewer {
+  position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.94);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.ig-viewer-box { width: min(430px, 100%); }
+.ig-viewer-progress { display: flex; gap: 4px; margin-bottom: 10px; }
+.ig-viewer-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.3); }
+.ig-viewer-bar.seen { background: #fff; }
+.ig-viewer-bar.now { background: var(--amber); }
+.ig-viewer-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ig-viewer-head .avatar { width: 32px; height: 32px; font-size: 13px; }
+.ig-viewer-head b { font-size: 14px; }
+.ig-viewer-head .muted { font-size: 12px; }
+.ig-viewer-close {
+  margin-left: auto; background: none; border: none; color: var(--ink);
+  font-size: 20px; cursor: pointer; padding: 4px 8px;
+}
+.ig-viewer-media { position: relative; border-radius: 14px; overflow: hidden; background: #000; }
+.ig-viewer-media img { width: 100%; max-height: 72vh; object-fit: contain; display: block; }
+.ig-viewer-zone {
+  position: absolute; top: 0; bottom: 0; width: 50%; background: none; border: none; cursor: pointer;
+}
+.ig-viewer-zone-left { left: 0; }
+.ig-viewer-zone-right { right: 0; }
+.ig-viewer-foot { display: flex; justify-content: center; margin-top: 12px; }
 /* Post card — Instagram layout: header, full-bleed media, icon action
    row, likes, caption, comments, add-a-comment. */
 .ig-post { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 24px; overflow: hidden; }

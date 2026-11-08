@@ -162,6 +162,195 @@ export function IgShareButton({ postId }) {
 }
 
 // ---------------------------------------------------------------------------
+// IgStories — the real 24-hour stories row + viewer (Nov 2026).
+// "Your story" first (tap = add a story), then one circle per member
+// WITH a live story (gradient ring). Members with no live story get no
+// circle — Instagram behavior. Tapping a member's circle opens the
+// full-screen viewer: that author's stories in order, auto-advancing
+// every 6 seconds, with prev/next, progress bars, time left, and close.
+// Your own live stories open in the viewer too, with an "Add to story"
+// link so you can add more.
+// ---------------------------------------------------------------------------
+function timeLeft(expiresAt) {
+  // SQLite stores UTC "YYYY-MM-DD HH:MM:SS" — parse it as UTC.
+  const end = new Date(String(expiresAt).replace(" ", "T") + "Z").getTime();
+  const ms = Math.max(0, end - Date.now());
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "less than a minute left";
+  if (mins < 60) return `${mins}m left`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ${mins % 60}m left`;
+}
+
+export function IgStories({ groups, me }) {
+  const [open, setOpen] = useState(null); // { groupIdx, storyIdx }
+  const myGroupIdx = groups.findIndex((g) => g.user_id === me.id);
+  const others = groups.filter((g) => g.user_id !== me.id);
+
+  // Auto-advance: 6 seconds per story, then the next story (or the
+  // next author's first story); closes at the end of the last one.
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => {
+      const group = groups[open.groupIdx];
+      if (open.storyIdx + 1 < group.stories.length) {
+        setOpen({ groupIdx: open.groupIdx, storyIdx: open.storyIdx + 1 });
+      } else if (open.groupIdx + 1 < groups.length) {
+        setOpen({ groupIdx: open.groupIdx + 1, storyIdx: 0 });
+      } else {
+        setOpen(null);
+      }
+    }, 6000);
+    return () => clearTimeout(id);
+  }, [open, groups]);
+
+  // Close on Escape; lock the page scroll while the viewer is open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(null);
+      if (e.key === "ArrowRight") next();
+      if (e.key === "ArrowLeft") prev();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
+  function next() {
+    if (!open) return;
+    const group = groups[open.groupIdx];
+    if (open.storyIdx + 1 < group.stories.length) setOpen({ groupIdx: open.groupIdx, storyIdx: open.storyIdx + 1 });
+    else if (open.groupIdx + 1 < groups.length) setOpen({ groupIdx: open.groupIdx + 1, storyIdx: 0 });
+    else setOpen(null);
+  }
+  function prev() {
+    if (!open) return;
+    if (open.storyIdx > 0) setOpen({ groupIdx: open.groupIdx, storyIdx: open.storyIdx - 1 });
+    else if (open.groupIdx > 0) {
+      const g = groups[open.groupIdx - 1];
+      setOpen({ groupIdx: open.groupIdx - 1, storyIdx: g.stories.length - 1 });
+    }
+  }
+
+  const openGroup = open ? groups[open.groupIdx] : null;
+  const openStory = openGroup ? openGroup.stories[open.storyIdx] : null;
+  const isMine = openGroup ? openGroup.user_id === me.id : false;
+
+  return (
+    <>
+      <div className="ig-stories">
+        {/* "Your story" — gradient ring when you have a live story (tap
+            opens your viewer); plain ring + plus when you don't (tap
+            opens the story creator). */}
+        {myGroupIdx >= 0 ? (
+          <button type="button" className="ig-story" onClick={() => setOpen({ groupIdx: myGroupIdx, storyIdx: 0 })} aria-label="Your stories">
+            <span className="ig-story-ring">
+              <span className="avatar">
+                {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
+              </span>
+            </span>
+            <span>Your story</span>
+          </button>
+        ) : (
+          <a href="/community/create?tab=story" className="ig-story ig-story-own" aria-label="Your story — add a story">
+            <span className="ig-story-ring">
+              <span className="avatar">
+                {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
+              </span>
+              <span className="ig-story-plus">+</span>
+            </span>
+            <span>Your story</span>
+          </a>
+        )}
+        {others.map((g) => (
+          <button
+            key={g.user_id}
+            type="button"
+            className="ig-story"
+            onClick={() => setOpen({ groupIdx: groups.indexOf(g), storyIdx: 0 })}
+            aria-label={`${g.name}'s stories`}
+          >
+            <span className="ig-story-ring">
+              <span className="avatar">
+                {g.profile_pic ? <img src={g.profile_pic} alt={g.name} /> : g.name[0]}
+              </span>
+            </span>
+            <span>{g.name}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Full-screen story viewer. */}
+      {open && openGroup && openStory ? (
+        <div className="ig-viewer" role="dialog" aria-label={`${openGroup.name}'s story`}>
+          <div className="ig-viewer-box">
+            <div className="ig-viewer-progress">
+              {openGroup.stories.map((s, i) => (
+                <span key={s.id} className={`ig-viewer-bar ${i < open.storyIdx ? "seen" : ""} ${i === open.storyIdx ? "now" : ""}`} />
+              ))}
+            </div>
+            <div className="ig-viewer-head">
+              <span className="avatar">
+                {openGroup.profile_pic ? <img src={openGroup.profile_pic} alt={openGroup.name} /> : openGroup.name[0]}
+              </span>
+              <b>{openGroup.name}</b>
+              <span className="muted">{timeLeft(openStory.expires_at)}</span>
+              <button type="button" className="ig-viewer-close" onClick={() => setOpen(null)} aria-label="Close stories">✕</button>
+            </div>
+            <div className="ig-viewer-media">
+              <button type="button" className="ig-viewer-zone ig-viewer-zone-left" onClick={prev} aria-label="Previous story" />
+              <img src={openStory.image_path} alt={`${openGroup.name}'s story`} />
+              <button type="button" className="ig-viewer-zone ig-viewer-zone-right" onClick={next} aria-label="Next story" />
+            </div>
+            <div className="ig-viewer-foot">
+              {isMine ? (
+                <a href="/community/create?tab=story" className="btn btn-amber btn-sm">＋ Add to story</a>
+              ) : (
+                <span className="small muted">{open.storyIdx + 1} of {openGroup.stories.length}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// StoryPicker — the story photo picker on the Create page. Choose up to
+// 10 photos at once; each becomes one 24-hour story. Shows small live
+// previews of the chosen files before posting.
+// ---------------------------------------------------------------------------
+export function StoryPicker() {
+  const [previews, setPreviews] = useState([]);
+  function onPick(e) {
+    const files = [...(e.target.files || [])].slice(0, 10);
+    setPreviews(files.map((f) => URL.createObjectURL(f)));
+  }
+  return (
+    <div>
+      <label className="ig-photo-pick" htmlFor="story-images">
+        <b>📷 Add photos</b>
+        Images only, up to 5 MB each — tap to choose from your device. You can add many at once.
+        <input id="story-images" name="image" type="file" accept="image/*" multiple onChange={onPick} style={{ display: "none" }} />
+      </label>
+      {previews.length > 0 ? (
+        <div className="ig-story-previews">
+          {previews.map((src, i) => (
+            <img key={i} src={src} alt={`Story photo ${i + 1}`} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // IgComposer — Instagram-style Create post. Photo FIRST (a big pick area
 // with a live preview), then caption, then the optional Drive video link.
 // Submits as a plain form POST to /api/community/posts — the server

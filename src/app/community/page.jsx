@@ -9,6 +9,10 @@
 // accent — left rail (icon + labels on desktop, icons-only on tablets),
 // center ~470px feed column, right panel (own profile + Suggested for
 // you). Below the feed: "You're all caught up" + Suggested Posts.
+// STORIES (Nov 2026): real 24-hour stories at the top — one photo per
+// story, deleted from the server after 24 hours. COMPOSER (Nov 2026):
+// the big open Create card is gone — a small collapsed bar opens the
+// dedicated Create page (/community/create) instead.
 // No separate login inside the community: members reaching this page
 // are already logged in — the enrollment locked preview is the only
 // gate. Only real features are linked: Home, Community, Special Chat,
@@ -21,10 +25,12 @@ import Link from "next/link";
 import { getDb } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import { canEnterCommunity } from "../../lib/access.js";
+import { getLiveStoryGroups } from "../../lib/stories.js";
 import { timeAgo } from "../../lib/utils.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
 import DrivePlayer from "../../components/DrivePlayer.jsx";
-import { SpecialChat, IgComposer, IgShareButton } from "../../components/CommunityClient.jsx";
+import IgRail from "../../components/IgRail.jsx";
+import { SpecialChat, IgStories, IgShareButton } from "../../components/CommunityClient.jsx";
 
 export const metadata = {
   title: "Community — Premium Live Trade Everyday — LearnChart FX",
@@ -64,21 +70,10 @@ function getFeed(userId) {
   return enrichPosts(db, posts, userId);
 }
 
-// Stories row — real members with recent posts only (latest post first).
-// Tap opens that member's profile. Never invented: only members who
-// actually posted appear here.
-function getStories() {
-  const db = getDb();
-  return db
-    .prepare(
-      `SELECT u.id, u.name, u.profile_pic, MAX(p.created_at) AS last_post
-       FROM posts p JOIN users u ON u.id = p.user_id
-       GROUP BY u.id, u.name, u.profile_pic
-       ORDER BY last_post DESC LIMIT 12`
-    )
-    .all()
-    .map((m) => ({ id: m.id, name: m.name, profile_pic: m.profile_pic }));
-}
+// Stories row — REAL 24-hour stories (src/lib/stories.js): only
+// members with a live (unexpired) story appear, newest first. The old
+// "members with recent posts" row is gone — a story is a photo posted
+// as a story, not a feed post.
 
 // Suggested for you — real members (newest first), with real data only:
 // post count + member-since. No follow system exists, so the action is
@@ -204,7 +199,7 @@ export default async function CommunityPage({ searchParams }) {
   }
 
   const feed = getFeed(user.id);
-  const stories = getStories();
+  const storyGroups = getLiveStoryGroups();
   const suggestedMembers = getSuggestedMembers(user.id);
   const suggestedPosts = getSuggestedPosts(user.id);
   const me = { id: user.id, name: user.name, profile_pic: user.profile_pic };
@@ -212,57 +207,28 @@ export default async function CommunityPage({ searchParams }) {
   return (
     <div className="ig-shell">
       {/* Left rail — Instagram navigation, only real features. */}
-      <aside className="ig-rail">
-        <Link href="/" className="ig-rail-logo" aria-label="LearnChart FX — Home">
-          <span className="mark">LC</span>
-          <span className="name">LEARNCHART <span>FX</span></span>
-        </Link>
-        <Link href="/" className="ig-rail-item"><span className="ic">⌂</span><span className="lbl">Home</span></Link>
-        <Link href="/community" className="ig-rail-item active" aria-current="page"><span className="ic">▦</span><span className="lbl">Community</span></Link>
-        <Link href="#special-chat" className="ig-rail-item"><span className="ic">⭐</span><span className="lbl">Special Chat</span></Link>
-        <Link href="/chat" className="ig-rail-item"><span className="ic">✈</span><span className="lbl">Messages</span></Link>
-        <Link href="#create-post" className="ig-rail-item"><span className="ic">＋</span><span className="lbl">Create</span></Link>
-        <Link href={`/members/${me.id}`} className="ig-rail-item">
-          <span className="avatar">{me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}</span>
-          <span className="lbl">Profile</span>
-        </Link>
-        <div className="ig-rail-spacer" />
-        <Link href="/profile" className="ig-rail-item"><span className="ic">☰</span><span className="lbl">More</span></Link>
-      </aside>
+      <IgRail active="community" me={me} />
 
       <div className="ig-main">
         {/* Center feed column. */}
         <div className="ig-feed-col">
           {sp?.error ? <div className="alert alert-error">{sp.error}</div> : null}
           {sp?.posted === "1" ? <div className="alert alert-ok">Your post is live in the feed.</div> : null}
+          {sp?.story === "1" ? <div className="alert alert-ok">Your story is live for 24 hours — then it disappears automatically.</div> : null}
 
-          {/* Stories — "Your story" first, then members with recent posts. */}
-          <div className="ig-stories">
-            <Link href="#create-post" className="ig-story ig-story-own" aria-label="Your story — create a post">
-              <span className="ig-story-ring">
-                <span className="avatar">
-                  {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
-                </span>
-                <span className="ig-story-plus">+</span>
-              </span>
-              <span>Your story</span>
-            </Link>
-            {stories.map((m) => (
-              <Link key={m.id} href={`/members/${m.id}`} className="ig-story" aria-label={`${m.name}'s profile`}>
-                <span className="ig-story-ring">
-                  <span className="avatar">
-                    {m.profile_pic ? <img src={m.profile_pic} alt={m.name} /> : m.name[0]}
-                  </span>
-                </span>
-                <span>{m.name}</span>
-              </Link>
-            ))}
-          </div>
+          {/* Stories — real 24-hour stories (tap a circle = viewer). */}
+          <IgStories groups={storyGroups} me={me} />
 
-          {/* Composer — photo first, Instagram Create style. */}
-          <div id="create-post">
-            <IgComposer me={me} />
-          </div>
+          {/* Composer — collapsed bar (Instagram/Facebook style). The full
+              composer lives on its own page (/community/create); the big
+              open card at the top of the feed is gone. */}
+          <Link href="/community/create" className="ig-composer-bar" aria-label="Create a post">
+            <span className="avatar">
+              {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
+            </span>
+            <span className="ig-composer-bar-text">Create a post…</span>
+            <span className="ig-composer-bar-photo" aria-hidden="true">📷</span>
+          </Link>
 
           {/* Feed — newest first, Instagram post cards. */}
           {feed.length === 0 ? (

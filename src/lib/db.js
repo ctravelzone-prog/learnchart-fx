@@ -203,6 +203,21 @@ CREATE TABLE IF NOT EXISTS saved_posts (
   UNIQUE(post_id, user_id)
 );
 
+-- 24-hour stories (Nov 2026): one row per story photo. expires_at is
+-- created_at + 24 hours. Every read filters expires_at > now, so an
+-- expired story is never visible even before cleanup runs; the read
+-- path also deletes expired rows AND their files (src/lib/stories.js),
+-- so no cron is needed. A member can post many stories at once.
+CREATE TABLE IF NOT EXISTS stories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  image_path TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
+CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id);
+
 CREATE TABLE IF NOT EXISTS member_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
