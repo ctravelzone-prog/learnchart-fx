@@ -60,7 +60,11 @@ export default async function AdminConsultationsPage({ searchParams }) {
                 <td>{r.mode}</td>
                 <td>{r.preferred_date}<br /><span className="small muted">{r.preferred_time}</span></td>
                 <td className="small muted">{new Date(r.created_at).toLocaleString("en-GB")}</td>
-                <td><Link href={`/admin/consultations/${r.id}`} className="amber">View →</Link></td>
+                {/* Explicit button per row (Nov 2026 discoverability
+                    fix): the old small "View →" text link was easy to
+                    miss — every row now has a real Review button to
+                    the detail page, where the Approve/Reject forms live. */}
+                <td><Link href={`/admin/consultations/${r.id}`} className="btn btn-amber btn-sm">View / Review →</Link></td>
               </tr>
             ))}
           </tbody>

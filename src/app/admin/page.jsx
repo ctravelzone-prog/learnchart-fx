@@ -34,7 +34,19 @@ export default async function AdminDashboardPage() {
         <div className="card stat-card"><b>{stats.users}</b><span className="muted">Total Users</span></div>
         <div className="card stat-card"><b>{stats.posts}</b><span className="muted">Community Posts</span></div>
         <div className="card stat-card"><b>{stats.unreadContact}</b><span className="muted">Unread Contact Messages</span></div>
-        <div className="card stat-card"><b>{stats.pendingConsultations}</b><span className="muted">Pending Consultation Requests</span></div>
+        {/* The Pending Consultation Requests card IS the action (Nov 2026
+            discoverability fix): Siam was on the dashboard, saw the
+            pending count, and found nothing to do from there. The whole
+            card links to /admin/consultations, and the button on it
+            says so. The button is a <span>, not a nested link — an <a>
+            inside an <a> would be invalid HTML. */}
+        <Link href="/admin/consultations" className="card stat-card" style={{ textDecoration: "none" }}>
+          <b>{stats.pendingConsultations}</b>
+          <span className="muted">Pending Consultation Requests</span>
+          <div style={{ marginTop: 10 }}>
+            <span className="btn btn-amber btn-sm">Review requests →</span>
+          </div>
+        </Link>
       </div>
 
       <div className="grid-2" style={{ marginTop: 20 }}>
