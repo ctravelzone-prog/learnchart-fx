@@ -1,11 +1,11 @@
 // ---------------------------------------------------------------------------
 // admin/layout.jsx — wrapper for every /admin page. The admin panel is
-// never indexed (robots noindex on every admin page). The admin nav bar
-// shows only when an admin session exists — the login page itself shows
-// without it. SECURITY does not live here: every /admin page calls
-// requireAdmin() and every /api/admin route calls getAdminUser(); this
-// layout only decides whether to display the nav.
+// never indexed (robots noindex on every admin page). The sidebar (via
+// AdminNav) shows only when an admin session exists — the login page
+// itself shows without it, and the shell still lays out cleanly then
+// because the main column simply takes the full width.
 // ---------------------------------------------------------------------------
+import "./admin.css";
 import AdminNav from "../../components/AdminNav.jsx";
 
 export const metadata = {
@@ -14,9 +14,9 @@ export const metadata = {
 
 export default function AdminLayout({ children }) {
   return (
-    <>
+    <div className="admin-shell">
       <AdminNav />
-      {children}
-    </>
+      <div className="admin-main">{children}</div>
+    </div>
   );
 }

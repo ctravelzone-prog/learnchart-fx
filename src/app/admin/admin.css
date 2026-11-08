@@ -1,0 +1,248 @@
+/* ---------------------------------------------------------------------------
+   admin.css — the master admin panel's own visual system (Nov 2026).
+   Modern + minimal: a slim grouped sidebar, generous whitespace, flat
+   cards, quiet tables. Scoped under .admin-shell / .admin-main so none
+   of it ever leaks onto the public site. The old top-strip admin nav
+   classes in globals.css are unused now (the sidebar uses new class
+   names) and are left alone on purpose.
+   --------------------------------------------------------------------------- */
+
+/* --- Shell: sidebar + main column --------------------------------------- */
+.admin-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+.admin-main {
+  flex: 1;
+  min-width: 0;
+}
+/* Calmer reading width + airier vertical rhythm inside the admin. */
+.admin-main .wrap {
+  max-width: 1080px;
+}
+.admin-main .section {
+  padding: 40px 0 72px;
+}
+/* Smaller, quieter page headings (pages set 36px inline; the override
+   keeps the hierarchy calm without touching 25 page files). */
+.admin-main h1 {
+  font-size: 28px !important;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.admin-main h1 + p {
+  margin-top: 0;
+  margin-bottom: 28px;
+}
+
+/* --- Sidebar (desktop) -------------------------------------------------- */
+.admin-sidebar {
+  width: 248px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #101010;
+  border-right: 1px solid #222;
+  padding: 20px 14px 16px;
+  overflow-y: auto;
+}
+.admin-side-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 18px;
+  border-bottom: 1px solid #222;
+  margin-bottom: 16px;
+}
+.admin-side-brand strong {
+  display: block;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  line-height: 1.2;
+}
+.admin-side-brand small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted2);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.admin-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--amber), var(--amber2));
+  display: grid;
+  place-items: center;
+  color: #111;
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.admin-side-nav {
+  flex: 1;
+}
+.admin-side-group {
+  margin-bottom: 18px;
+}
+.admin-side-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  padding: 0 10px 6px;
+}
+.admin-side-link {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+  border-left: 3px solid transparent;
+  margin-left: -3px;
+}
+.admin-side-link:hover {
+  color: var(--ink);
+  background: #1a1a1a;
+}
+.admin-side-link.active {
+  color: var(--amber);
+  background: rgba(255, 197, 49, 0.08);
+  border-left-color: var(--amber);
+}
+.admin-side-link.small {
+  font-size: 13px;
+}
+.admin-side-foot {
+  border-top: 1px solid #222;
+  padding-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+.admin-side-email {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 0 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-side-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 10px;
+  flex-wrap: wrap;
+}
+.admin-side-actions form {
+  margin: 0;
+}
+
+/* --- Mobile top bar + drawer (phones only) ------------------------------- */
+.admin-topbar,
+.admin-backdrop {
+  display: none;
+}
+
+/* --- Flat, quiet cards + tables inside the admin ------------------------ */
+.admin-main .card {
+  border-color: #262626;
+  box-shadow: none;
+}
+/* A table card reads best flush: no inner padding, the table itself
+   carries the spacing. */
+.admin-main .card.tbl-wrap {
+  padding: 0;
+  overflow: hidden;
+}
+.admin-main .tbl th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted2);
+  padding: 12px 16px;
+}
+.admin-main .tbl td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #232323;
+}
+.admin-main .tbl tr:last-child td {
+  border-bottom: none;
+}
+.admin-main .tbl tr:hover td {
+  background: #161616;
+}
+/* Stat numbers breathe a little more. */
+.admin-main .stat-card {
+  padding: 26px 12px;
+}
+/* Form cards: one calm column of fields. */
+.admin-main .card .field {
+  margin-bottom: 18px;
+}
+
+/* --- Phones: sidebar becomes a hamburger drawer -------------------------- */
+@media (max-width: 900px) {
+  .admin-shell {
+    display: block;
+  }
+  .admin-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: #101010;
+    border-bottom: 1px solid #222;
+    padding: 10px 16px;
+  }
+  .admin-topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: "Poppins", sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .admin-burger {
+    background: none;
+    border: 1px solid var(--line2);
+    border-radius: 10px;
+    color: var(--ink);
+    font-size: 19px;
+    padding: 6px 11px;
+  }
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 70;
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+  }
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+  .admin-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .admin-main .section {
+    padding: 28px 0 56px;
+  }
+}
