@@ -31,7 +31,7 @@ export const PAGE_DEFAULTS = {
       sub: { label: "Hero subtitle", type: "textarea", value: "Learn forex trading with a trusted mentor, manage risk with a clear plan, and trade with confidence — step by step, from basics to live markets." },
       cta_enroll: { label: "Hero button 1", type: "text", value: "Enroll Now" },
       cta_mentors: { label: "Hero button 2", type: "text", value: "Meet Your Mentors" },
-      batch_badge: { label: "Next-batch badge", type: "text", value: "NEXT BATCH" },
+      batch_badge: { label: "Next-batch heading (bold, above the date)", type: "text", value: "Next Batch" },
       batch_title: { label: "Next-batch title", type: "text", value: "Starting on January 10" },
       batch_sub: { label: "Next-batch subtitle", type: "textarea", value: "The next batch of the Forex Trading Premium Course begins soon. Reserve your seat." },
       countdown_label: { label: "Countdown label", type: "text", value: "Countdown to the next batch" },

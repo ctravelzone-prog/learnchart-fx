@@ -72,65 +72,74 @@ export default async function HomePage() {
 
   return (
     <div>
-      {/* 2 — Hero + Next Batch countdown */}
-      <section className="wrap hero">
-        <div>
-          <h1>
-            {pc.hero.title_start} <span className="amber">{pc.hero.title_highlight}</span> {pc.hero.title_end}
-          </h1>
-          <p>
-            {pc.hero.sub}
-          </p>
-          <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-            <Link href="/courses" className="btn btn-amber">{pc.hero.cta_enroll}</Link>
-            <Link href="/mentors" className="btn btn-dark">{pc.hero.cta_mentors}</Link>
+      {/* 2 — Hero + Next Batch countdown (design: centered .hero-c) */}
+      <section className="wrap hero hero-c">
+        <h1>
+          {pc.hero.title_start} <span className="amber">{pc.hero.title_highlight}</span> {pc.hero.title_end}
+        </h1>
+        <p className="lede">
+          {pc.hero.sub}
+        </p>
+        <div className="hero-row">
+          <Link href="/courses" className="btn btn-amber btn-lg">{pc.hero.cta_enroll} →</Link>
+          <div className="batch2">
+            <div className="batch2-head"><b>{pc.hero.batch_badge}</b><span>{pc.hero.batch_title}</span></div>
+            <Countdown target={nextBatchDate} label={pc.hero.countdown_label} />
           </div>
-        </div>
-        <div className="card">
-          <span className="badge badge-amber">{pc.hero.batch_badge}</span>
-          <h3 style={{ marginTop: 12 }}>{pc.hero.batch_title}</h3>
-          <p className="muted small">{pc.hero.batch_sub}</p>
-          <Countdown target={nextBatchDate} label={pc.hero.countdown_label} />
         </div>
       </section>
 
       <div className="dots" />
 
-      {/* 3 — Featured course showcase (design: feat-card + info panel) */}
-      <section className="wrap section">
-        <div className="grid-2">
-          <div className="card">
-            <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 14, alignItems: "center" }}>
-              <div>
-                <span className="badge badge-amber">{pc.featured.badge}</span>
-                <h2 style={{ marginTop: 12 }}>{pc.featured.title}</h2>
-                <p className="muted">
+      {/* 3 — Featured course showcase (design: one wide 3-column
+          composition — left side cards, center featured card, right
+          info panel; NOT two separate columns) */}
+      <section className="wrap" style={{ padding: "6px 0 8px" }}>
+        <div className="showcase">
+          {/* Left: stacked small cards — mindset lesson + curriculum PDF */}
+          <div className="side-col">
+            <div className="side-card">
+              <div className="sc-img">
+                <img src={pc.featured.sc_image} alt="Trading mindset lesson — mentor teaching trading psychology" loading="lazy" />
+                <span className="dur">{pc.featured.sc_duration}</span>
+              </div>
+              <div className="sc-body">
+                <h4>{pc.featured.sc_chip}</h4>
+                <p><strong>{pc.featured.sc_title}</strong> {pc.featured.sc_text}</p>
+              </div>
+            </div>
+            <div className="side-card pdf-card">
+              <div className="pdf-ic">PDF</div>
+              <div className="pdf-name">{pc.featured.curriculum_label}</div>
+              <a href="/api/curriculum" className="btn btn-amber btn-sm btn-block">{pc.featured.curriculum_button}</a>
+            </div>
+          </div>
+
+          {/* Center: big featured card with mentor photo + thumbnail strip */}
+          <div className="feat-card">
+            <div className="feat-top">
+              <span className="feat-brand">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="7" width="4" height="9" rx="1" fill="#2fbf71" /><rect x="10" y="4" width="4" height="12" rx="1" fill="#e5484d" /><rect x="17" y="9" width="4" height="8" rx="1" fill="#ffb52e" /></svg>
+                LEARNCHART FX
+              </span>
+              <span className="fake-nav"><span>Home</span><span className="on">Courses &amp; Services</span><span>Contact Us</span></span>
+            </div>
+            <div className="feat-main">
+              <div className="feat-text">
+                <span className="feat-badge">{pc.featured.badge}</span>
+                <h3>{pc.featured.title}</h3>
+                <p>
                   {pc.featured.text}
                 </p>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link href="/courses" className="btn btn-amber">{pc.featured.cta_join}</Link>
-                  <Link href="/faq" className="btn btn-dark">{pc.featured.cta_learn}</Link>
+                <div className="feat-btns">
+                  <Link href="/courses" className="btn btn-amber btn-sm">{pc.featured.cta_join}</Link>
+                  <Link href="/faq" className="btn btn-ghost btn-sm">{pc.featured.cta_learn}</Link>
+                  <Link href="/courses" className="plus-btn" aria-label="See all courses and services">+</Link>
                 </div>
               </div>
               <div className="feat-photo">
                 <img src={pc.featured.photo} alt="Mentor Siam Chowdhury at his trading desk with candlestick charts on the monitors" />
               </div>
-            </div>
-            <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-              <div className="sc-img">
-                <img src={pc.featured.sc_image} alt="Trading mindset lesson — mentor teaching trading psychology" loading="lazy" />
-                <span className="dur">{pc.featured.sc_duration}</span>
-              </div>
-              <span className="chip">{pc.featured.sc_chip}</span>
-              <p style={{ margin: "8px 0 0" }}>
-                <strong>{pc.featured.sc_title}</strong>{" "}
-                <span className="muted">{pc.featured.sc_text}</span>
-              </p>
-            </div>
-            <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-              <span className="badge">PDF</span>
-              <p style={{ margin: "8px 0" }}><strong>{pc.featured.curriculum_label}</strong></p>
-              <a href="/api/curriculum" className="btn btn-dark btn-sm">{pc.featured.curriculum_button}</a>
             </div>
             <div className="feat-strip">
               <div className="fthumb"><img src="/images/mentor-desk.webp" alt="Lesson 1 — starting your trading journey" loading="lazy" /><b>1</b></div>
@@ -139,27 +148,33 @@ export default async function HomePage() {
               <div className="fthumb"><img src="/images/consultation-call.webp" alt="Lesson 4 — trading psychology" loading="lazy" /><b>4</b></div>
             </div>
           </div>
-          <div className="card">
-            <h3>{pc.featured.info_title}</h3>
-            <p className="muted">{pc.featured.info_text}</p>
-            <div>
-              <span className="chip">{pc.featured.info_chip1}</span>
-              <span className="chip">{pc.featured.info_chip2}</span>
+
+          {/* Right: info panel — 90% ring, chips, first two lessons */}
+          <aside className="info-panel">
+            <div className="ip-head">
+              <h3>{pc.featured.info_title}</h3>
+              <span className="ring" role="img" aria-label="90 percent">
+                <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#2e2e2e" strokeWidth="3.4" /><circle cx="18" cy="18" r="15.9" fill="none" stroke="#ffb52e" strokeWidth="3.4" pathLength="100" strokeDasharray="90 100" strokeLinecap="round" transform="rotate(-90 18 18)" /></svg>
+                <span className="ring-t">90%</span>
+              </span>
             </div>
-            <div style={{ marginTop: 16 }}>
-              <div className="lesson-row">
-                <img src="/images/mentor-desk.webp" alt="" loading="lazy" />
-                <b>Starting Your Trading Journey</b>
-                <span className="num">1</span>
-              </div>
-              <div className="lesson-row">
-                <img src="/images/consultation-call.webp" alt="" loading="lazy" />
-                <b>Mastering Trading Psychology</b>
-                <span className="num">2</span>
-              </div>
+            <p>{pc.featured.info_text}</p>
+            <div className="ip-chips">
+              <span>{pc.featured.info_chip1}</span>
+              <span>{pc.featured.info_chip2}</span>
             </div>
+            <Link href="/course-videos" className="lesson-row">
+              <img src="/images/mentor-desk.webp" alt="" loading="lazy" />
+              <b>Starting Your Trading Journey</b>
+              <span className="num">1</span>
+            </Link>
+            <Link href="/course-videos" className="lesson-row">
+              <img src="/images/consultation-call.webp" alt="" loading="lazy" />
+              <b>Mastering Trading Psychology</b>
+              <span className="num">2</span>
+            </Link>
             <p className="small muted">{pc.featured.strip_note}</p>
-          </div>
+          </aside>
         </div>
       </section>
 

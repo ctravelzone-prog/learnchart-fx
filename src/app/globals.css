@@ -123,17 +123,75 @@ h1, h2, h3, h4 { font-family: "Poppins", system-ui, sans-serif; line-height: 1.1
 .check-list li { padding: 7px 0 7px 28px; position: relative; color: var(--muted); }
 .check-list li::before { content: "✓"; position: absolute; left: 0; color: var(--green2); font-weight: 800; }
 
-/* --- Hero & countdown --- */
-.hero { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 28px; align-items: center; padding: 48px 0 30px; }
-.hero h1 { font-size: 46px; font-weight: 800; }
-.hero p { color: var(--muted); font-size: 17px; }
-.countdown { display: flex; gap: 10px; margin-top: 16px; }
-.cd-box {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  min-width: 64px; padding: 12px 8px; text-align: center;
+/* --- Hero (centered, design: .hero-c) + Next Batch countdown ---
+   The design's home hero is CENTERED: headline, sub-line and the
+   Enroll Now button all centered; the countdown sits at the right
+   as plain yellow flip-number boxes — never inside a bordered card.
+   On phones the countdown drops below the button, centered. */
+.hero { position: relative; overflow: hidden; text-align: center; padding: 58px 0 26px; }
+.hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(560px 300px at 78% 8%, rgba(255,181,46,0.10), transparent 65%); pointer-events: none; }
+.hero h1 { font-size: clamp(34px, 4.6vw, 54px); font-weight: 800; letter-spacing: -0.01em; max-width: 21em; margin: 0 auto; position: relative; }
+.hero h1 .amber { background: linear-gradient(120deg, var(--amber), var(--amber2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero .lede { color: var(--muted); font-size: 17.5px; margin: 18px auto 6px; max-width: 32em; text-align: center; position: relative; }
+.hero-row { position: relative; display: flex; justify-content: center; align-items: flex-start; min-height: 92px; margin-top: 14px; }
+.batch2 { position: absolute; right: 0; top: 0; text-align: right; }
+.batch2-head b { font-family: "Poppins", sans-serif; font-size: 19px; display: block; line-height: 1.15; }
+.batch2-head span { color: var(--muted); font-size: 13.5px; }
+.digits { display: flex; gap: 10px; margin-top: 9px; }
+.dgroup { text-align: center; }
+.drow { display: flex; gap: 5px; }
+.digit {
+  width: 33px; height: 41px; background: linear-gradient(160deg, #ffd34d, var(--amber2));
+  border-radius: 7px; color: #1a1002; font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 700; font-size: 21px; display: grid; place-items: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
-.cd-box b { display: block; font-family: "Poppins", sans-serif; font-size: 26px; }
-.cd-box span { font-size: 12px; color: var(--muted2); }
+.dlab { font-size: 9px; letter-spacing: 0.2em; color: var(--muted2); font-weight: 700; display: block; margin-top: 5px; }
+.btn-lg { padding: 14px 32px; font-size: 16px; }
+.btn-block { display: block; width: 100%; text-align: center; }
+
+/* --- Featured showcase (design: one wide 3-column composition) ---
+   Left: two stacked small cards (mindset lesson + curriculum PDF).
+   Center: the big featured card with mentor photo + thumbnail strip.
+   Right: the info panel with the 90% ring and the first two lessons.
+   At <=1080px the info panel spans the full width; at <=700px the
+   whole showcase stacks to one column. */
+.showcase { display: grid; grid-template-columns: 232px 1fr 292px; gap: 18px; align-items: start; }
+.side-col { display: grid; gap: 18px; }
+.side-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.sc-body { padding: 13px 15px 15px; }
+.sc-body h4 { font-size: 14px; letter-spacing: 0.02em; }
+.sc-body p { color: var(--muted); font-size: 12.5px; margin: 5px 0 0; }
+.pdf-card { padding: 20px 18px; text-align: center; }
+.pdf-ic {
+  width: 62px; height: 62px; margin: 2px auto 13px; border-radius: 12px;
+  background: linear-gradient(150deg, #ffd34d, var(--amber2)); color: #1a1002;
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 700; font-size: 16px;
+  display: grid; place-items: center;
+}
+.pdf-name { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.22em; color: var(--muted); margin-bottom: 15px; }
+.feat-card { background: linear-gradient(180deg, #1c1c1c, #131313); border: 1px solid var(--line2); border-radius: 18px; overflow: hidden; }
+.feat-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 18px; border-bottom: 1px solid var(--line); }
+.feat-brand { display: flex; align-items: center; gap: 7px; font-family: "Poppins", sans-serif; font-weight: 800; font-size: 12.5px; letter-spacing: 0.03em; }
+.fake-nav { display: flex; gap: 5px; background: #101010; border: 1px solid var(--line); border-radius: 99px; padding: 4px; }
+.fake-nav span { font-size: 11px; font-weight: 600; color: var(--muted); padding: 4px 10px; border-radius: 99px; white-space: nowrap; }
+.fake-nav span.on { background: var(--amber); color: #1a1002; }
+.feat-main { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 14px; padding: 22px 22px 4px; align-items: center; }
+.feat-badge { display: inline-block; background: var(--red); color: #fff; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: 6px; }
+.feat-text h3 { font-size: clamp(24px, 2.6vw, 31px); margin: 13px 0 9px; letter-spacing: 0.01em; }
+.feat-text p { color: var(--muted); font-size: 14px; margin: 0; }
+.feat-btns { display: flex; gap: 10px; align-items: center; margin-top: 17px; flex-wrap: wrap; }
+.plus-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line2); color: var(--ink); font-size: 20px; display: grid; place-items: center; background: transparent; }
+.plus-btn:hover { border-color: var(--amber); color: var(--amber); }
+.info-panel { background: var(--panel); border: 1px solid var(--line2); border-radius: 18px; padding: 20px; }
+.ip-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ip-head h3 { font-size: 19px; letter-spacing: 0.02em; }
+.info-panel > p { color: #d8dbdd; font-size: 13.5px; margin: 10px 0 0; }
+.ring { position: relative; width: 52px; height: 52px; flex-shrink: 0; display: inline-block; }
+.ring svg { width: 100%; height: 100%; display: block; }
+.ring-t { position: absolute; inset: 0; display: grid; place-items: center; font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 700; font-size: 11px; color: var(--amber); }
+.ip-chips { display: flex; gap: 8px; margin: 13px 0 4px; flex-wrap: wrap; }
+.ip-chips span { background: var(--panel3); border: 1px solid var(--line); border-radius: 7px; padding: 5px 11px; font-size: 12px; font-weight: 600; }
 
 /* --- Locked preview (never a blank page, never a silent redirect) --- */
 .locked {
@@ -248,15 +306,15 @@ h1, h2, h3, h4 { font-family: "Poppins", system-ui, sans-serif; line-height: 1.1
    /public/images/ and are referenced by slot below. Sizing follows
    the design's own CSS. */
 .feat-photo img { border-radius: 14px; height: 288px; width: 100%; object-fit: cover; }
-.feat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 18px; }
+.feat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 16px 22px 20px; }
 .fthumb { position: relative; border-radius: 10px; overflow: hidden; background: #0c0c0c; }
 .fthumb img { height: 72px; width: 100%; object-fit: cover; opacity: 0.92; }
 .fthumb b {
   position: absolute; left: 7px; bottom: 0; font-family: "Poppins", sans-serif;
   font-weight: 800; font-size: 32px; line-height: 1; color: rgba(255,255,255,0.34);
 }
-.sc-img { position: relative; margin-bottom: 12px; }
-.sc-img img { border-radius: 12px; height: 150px; width: 100%; object-fit: cover; }
+.sc-img { position: relative; }
+.sc-img img { border-radius: 12px; height: 118px; width: 100%; object-fit: cover; }
 .sc-img .dur {
   position: absolute; right: 10px; bottom: 10px; background: rgba(0,0,0,0.72);
   color: var(--ink); font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px;
@@ -314,9 +372,17 @@ h1, h2, h3, h4 { font-family: "Poppins", system-ui, sans-serif; line-height: 1.1
 .yt-player .yt-note { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px; font-size: 13px; color: #e8e8e8; text-shadow: 0 1px 6px rgba(0,0,0,0.7); }
 
 /* --- Responsive --- */
+@media (max-width: 1080px) {
+  .showcase { grid-template-columns: 1fr 1fr; }
+  .showcase .info-panel { grid-column: 1 / -1; }
+}
+@media (max-width: 920px) {
+  .batch2 { position: static; margin: 20px auto 0; }
+  .batch2-head { text-align: center; }
+  .digits { justify-content: center; }
+  .hero-row { flex-direction: column; align-items: center; min-height: 0; }
+}
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; }
-  .hero h1 { font-size: 34px; }
   .grid-3, .grid-4, .grid-6 { grid-template-columns: 1fr 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
   .community-layout { grid-template-columns: 1fr; }
@@ -331,6 +397,11 @@ h1, h2, h3, h4 { font-family: "Poppins", system-ui, sans-serif; line-height: 1.1
   .nav-links.open { display: flex; }
   .burger { display: block; }
   .nav-right .hide-mobile { display: none; }
+}
+@media (max-width: 700px) {
+  .showcase { grid-template-columns: 1fr; }
+  .feat-main { grid-template-columns: 1fr; }
+  .feat-photo img { height: 230px; }
 }
 @media (max-width: 560px) {
   .grid-3, .grid-4, .grid-6 { grid-template-columns: 1fr; }
