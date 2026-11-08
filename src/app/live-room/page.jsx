@@ -63,8 +63,8 @@ export default async function LiveRoomPage() {
         <div className="alert alert-info">
           Live stream provider: <strong>{getSingleSetting("live_stream_provider", LIVE_STREAM_PROVIDER)}</strong> — the live player will appear here once Siam confirms the streaming provider.
         </div>
-        <p>✅ You are in the live room. Ask your questions in the Mentor Special Chat inside the Community and use @Mentor so they get picked up live.</p>
-        <Link href="/community" className="btn btn-amber">Open Mentor Special Chat →</Link>
+        <p>✅ You are in the live room. Ask your questions in the Mentor Special Chat and use @Mentor so they get picked up live.</p>
+        <Link href="/community/special-chat" className="btn btn-amber">Open Mentor Special Chat →</Link>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

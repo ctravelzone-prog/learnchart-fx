@@ -517,6 +517,7 @@ button.ig-story { background: none; border: none; padding: 0; cursor: pointer; f
 .ig-text-media p { font-family: "Poppins", sans-serif; font-size: 18px; line-height: 1.5; margin: 0; white-space: pre-wrap; }
 .ig-actions { display: flex; gap: 16px; align-items: center; padding: 10px 14px 0; }
 .ig-icon-btn { background: none; border: none; padding: 0; font-size: 24px; line-height: 1; color: var(--ink); cursor: pointer; }
+.ig-icon-btn svg { display: block; }
 .ig-icon-btn:hover { color: var(--amber); }
 .ig-like-btn.liked { color: var(--red); }
 .ig-share-done { font-size: 13px; color: var(--green2); font-weight: 700; }

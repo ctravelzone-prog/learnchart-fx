@@ -142,8 +142,9 @@ export function MemberChat({ members, meId }) {
 }
 
 // ---------------------------------------------------------------------------
-// IgShareButton — Instagram-style share (paper plane). Copies a link to
-// the post to the clipboard; no DM is sent anywhere. Client-side only.
+// IgShareButton — Instagram-style share (paper-plane SVG outline).
+// Copies a link to the post to the clipboard; no DM is sent anywhere.
+// Client-side only. Feedback is plain text ("Link copied") — no emoji.
 // ---------------------------------------------------------------------------
 export function IgShareButton({ postId }) {
   const [copied, setCopied] = useState(false);
@@ -155,9 +156,11 @@ export function IgShareButton({ postId }) {
     } catch { /* clipboard blocked — nothing to do */ }
   }
   return copied ? (
-    <span className="ig-share-done">✓ Link copied</span>
+    <span className="ig-share-done">Link copied</span>
   ) : (
-    <button type="button" className="ig-icon-btn" onClick={share} aria-label="Share post">✈</button>
+    <button type="button" className="ig-icon-btn" onClick={share} aria-label="Share post">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+    </button>
   );
 }
 

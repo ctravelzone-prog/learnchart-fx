@@ -62,7 +62,7 @@ export default async function ChatPage({ searchParams }) {
       <h1 style={{ fontSize: 36 }}>Messages</h1>
       <p className="muted">
         Talk one-to-one with other members. Pick a member on the left — your conversation opens on the right.
-        The Mentor Special Chat stays inside the Community page.
+        The Mentor Special Chat lives on its own page — <Link href="/community/special-chat" className="amber">Special Chat →</Link>
       </p>
       <ChatRoom members={members} meId={user.id} peerId={peerId} />
     </div>

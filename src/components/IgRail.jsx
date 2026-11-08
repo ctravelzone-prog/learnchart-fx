@@ -16,7 +16,7 @@ export default function IgRail({ active, me }) {
       </Link>
       <Link href="/" className="ig-rail-item"><span className="ic">⌂</span><span className="lbl">Home</span></Link>
       <Link href="/community" className={`ig-rail-item ${active === "community" ? "active" : ""}`} aria-current={active === "community" ? "page" : undefined}><span className="ic">▦</span><span className="lbl">Community</span></Link>
-      <Link href="/community#special-chat" className="ig-rail-item"><span className="ic">⭐</span><span className="lbl">Special Chat</span></Link>
+      <Link href="/community/special-chat" className={`ig-rail-item ${active === "special-chat" ? "active" : ""}`} aria-current={active === "special-chat" ? "page" : undefined}><span className="ic">⭐</span><span className="lbl">Special Chat</span></Link>
       <Link href="/chat" className="ig-rail-item"><span className="ic">✈</span><span className="lbl">Messages</span></Link>
       <Link href="/community/create" className={`ig-rail-item ${active === "create" ? "active" : ""}`} aria-current={active === "create" ? "page" : undefined}><span className="ic">＋</span><span className="lbl">Create</span></Link>
       <Link href={`/members/${me.id}`} className="ig-rail-item">

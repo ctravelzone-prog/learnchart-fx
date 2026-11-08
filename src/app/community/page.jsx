@@ -19,7 +19,9 @@
 // Messages (/chat), Create, Profile, More — no Search, Explore/Reels
 // or Notifications (they don't exist). No invented followers/following.
 // Member-to-member chat lives on its own page (/chat); the Mentor
-// Special Chat stays on this page, below the feed. Gated: noindex.
+// Special Chat, Member Chat and Quick links live on their own page
+// (/community/special-chat) — the feed ends after "You're all caught
+// up" / Suggested Posts. Gated: noindex.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getDb } from "../../lib/db.js";
@@ -30,7 +32,7 @@ import { timeAgo } from "../../lib/utils.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
 import DrivePlayer from "../../components/DrivePlayer.jsx";
 import IgRail from "../../components/IgRail.jsx";
-import { SpecialChat, IgStories, IgShareButton } from "../../components/CommunityClient.jsx";
+import { IgStories, IgShareButton } from "../../components/CommunityClient.jsx";
 
 export const metadata = {
   title: "Community — Premium Live Trade Everyday — LearnChart FX",
@@ -129,24 +131,30 @@ function PostCardIG({ p }) {
       ) : p.text ? (
         <div className="ig-text-media"><p>{p.text}</p></div>
       ) : null}
+      {/* Action row — Instagram-style SVG outline icons (Nov 2026, no
+          emoji here): heart (fills red when liked), comment bubble
+          (tap focuses the add-comment box), paper-plane share (copies
+          the post link), bookmark (fills amber when saved). Counts stay
+          next to the icons; all behavior is unchanged. */}
       <div className="ig-actions">
         <form action="/api/community/like" method="post" style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <input type="hidden" name="post_id" value={p.id} />
           <button type="submit" className={`ig-icon-btn ig-like-btn ${p.likedByMe ? "liked" : ""}`} aria-label={p.likedByMe ? "Unlike" : "Like"}>
-            {p.likedByMe ? "♥" : "♡"}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill={p.likedByMe ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
           </button>
           <span className="small" style={{ fontWeight: 700 }}>{p.likes}</span>
         </form>
         {/* The comment icon is a label for the add-comment box — tap focuses it. */}
         <label htmlFor={`ig-comment-${p.id}`} className="ig-icon-btn" aria-label="Comment" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          💬<span className="small" style={{ fontWeight: 700 }}>{p.comments.length}</span>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+          <span className="small" style={{ fontWeight: 700 }}>{p.comments.length}</span>
         </label>
         <IgShareButton postId={p.id} />
         {/* Bookmark (save) — a real save, listed on your own profile. */}
         <form action="/api/community/save" method="post" style={{ marginLeft: "auto" }}>
           <input type="hidden" name="post_id" value={p.id} />
           <button type="submit" className={`ig-icon-btn ig-save-btn ${p.savedByMe ? "saved" : ""}`} aria-label={p.savedByMe ? "Remove bookmark" : "Save post"}>
-            🔖
+            <svg width="24" height="24" viewBox="0 0 24 24" fill={p.savedByMe ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
           </button>
         </form>
       </div>
@@ -257,24 +265,10 @@ export default async function CommunityPage({ searchParams }) {
             </div>
           ) : null}
 
-          {/* Mentor Special Chat — below the feed, DM style. */}
-          <div className="card" id="special-chat" style={{ marginBottom: 16, marginTop: 24 }}>
-            <h3>⭐ Mentor Special Chat</h3>
-            <SpecialChat />
-          </div>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h3>💬 Member Chat</h3>
-            <p className="small muted">
-              Chat one-to-one with other members in a separate chat box — pick a member and talk.
-            </p>
-            <Link href="/chat" className="btn btn-amber btn-sm">Open Chat →</Link>
-          </div>
-          <div className="card">
-            <h3>Quick links</h3>
-            <p><Link href="/live-room" className="amber">🔴 Live Room →</Link></p>
-            <p><Link href="/consultation" className="amber">🎧 My Consultations →</Link></p>
-            <p><Link href="/course-videos" className="amber">🎓 My Course Videos →</Link></p>
-          </div>
+          {/* Feed ends here — "You're all caught up" / Suggested Posts
+              are the last sections. The Mentor Special Chat, Member Chat
+              and Quick links moved to their own page
+              (/community/special-chat, Nov 2026). */}
         </div>
 
         {/* Right panel — own profile + Suggested for you. */}
