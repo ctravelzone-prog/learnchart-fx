@@ -193,6 +193,16 @@ CREATE TABLE IF NOT EXISTS likes (
   UNIQUE(post_id, user_id)
 );
 
+-- Saved posts (Instagram bookmark): one save per user per post; tapping
+-- again removes it. Same toggle pattern as likes.
+CREATE TABLE IF NOT EXISTS saved_posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(post_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS member_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

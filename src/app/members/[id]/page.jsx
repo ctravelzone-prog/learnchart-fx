@@ -29,6 +29,17 @@ function getMemberPosts(memberId) {
     .all(memberId);
 }
 
+// Posts this member bookmarked (saved) — shown only on your own profile.
+function getSavedPosts(memberId) {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT p.* FROM saved_posts s JOIN posts p ON p.id = s.post_id
+       WHERE s.user_id = ? ORDER BY s.created_at DESC, s.id DESC LIMIT 50`
+    )
+    .all(memberId);
+}
+
 export default async function MemberProfilePage({ params }) {
   // Next.js 15: params is a Promise — await it first.
   const { id } = await params;
@@ -61,6 +72,7 @@ export default async function MemberProfilePage({ params }) {
 
   const posts = getMemberPosts(member.id);
   const isMe = member.id === user.id;
+  const savedPosts = isMe ? getSavedPosts(member.id) : [];
 
   return (
     <div className="wrap section">
@@ -107,6 +119,30 @@ export default async function MemberProfilePage({ params }) {
           ))}
         </div>
       )}
+
+      {/* Saved posts — your bookmarks, only on your own profile. */}
+      {isMe ? (
+        <>
+          <div className="ig-grid-head" style={{ marginTop: 28 }}>🔖 SAVED</div>
+          {savedPosts.length === 0 ? (
+            <div className="card center"><p className="muted">No saved posts yet — tap the bookmark icon on any post to save it here.</p></div>
+          ) : (
+            <div className="ig-grid">
+              {savedPosts.map((p) => (
+                <Link key={p.id} href={`/community#post-${p.id}`} className="ig-tile" aria-label={`Open saved post from ${new Date(p.created_at).toLocaleDateString("en-GB")}`}>
+                  {p.image_path ? (
+                    <img src={p.image_path} alt="Post picture" loading="lazy" />
+                  ) : p.drive_file_id ? (
+                    <span className="ig-tile-play">▶</span>
+                  ) : (
+                    <span className="ig-tile-text">{p.text}</span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }

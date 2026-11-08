@@ -4,14 +4,18 @@
 // access.js): any enrollment unlocks it; everyone else sees the locked
 // preview naming exactly which enrollments unlock it.
 //
-// LOOK (Nov 2026, Siam's order): EXACTLY like Instagram — single centered
-// ~470px feed column, a stories row of members with recent posts on top,
-// Instagram-style post cards (header, big media, heart/comment/share
-// icons, likes, caption, comments, add-a-comment), photo-first composer.
-// No separate login inside the community: members reaching this page are
-// already logged in — the enrollment locked preview is the only gate.
-// Member-to-member chat lives on its own page (/chat); the Mentor Special
-// Chat stays on this page, below the feed. Gated: noindex.
+// LOOK (Nov 2026, Siam's screenshots of real Instagram desktop): the
+// Instagram 3-column desktop layout, LearnChart dark theme + amber
+// accent — left rail (icon + labels on desktop, icons-only on tablets),
+// center ~470px feed column, right panel (own profile + Suggested for
+// you). Below the feed: "You're all caught up" + Suggested Posts.
+// No separate login inside the community: members reaching this page
+// are already logged in — the enrollment locked preview is the only
+// gate. Only real features are linked: Home, Community, Special Chat,
+// Messages (/chat), Create, Profile, More — no Search, Explore/Reels
+// or Notifications (they don't exist). No invented followers/following.
+// Member-to-member chat lives on its own page (/chat); the Mentor
+// Special Chat stays on this page, below the feed. Gated: noindex.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getDb } from "../../lib/db.js";
@@ -28,6 +32,26 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
+// Likes / liked-by-me / saved-by-me / comments for a list of post rows.
+function enrichPosts(db, rows, userId) {
+  return rows.map((p) => {
+    const likes = db.prepare("SELECT COUNT(*) AS c FROM likes WHERE post_id = ?").get(p.id).c;
+    const likedByMe = userId
+      ? !!db.prepare("SELECT id FROM likes WHERE post_id = ? AND user_id = ?").get(p.id, userId)
+      : false;
+    const savedByMe = userId
+      ? !!db.prepare("SELECT id FROM saved_posts WHERE post_id = ? AND user_id = ?").get(p.id, userId)
+      : false;
+    const comments = db
+      .prepare(
+        `SELECT c.*, u.name AS author_name FROM comments c
+         JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC`
+      )
+      .all(p.id);
+    return { ...p, likes, likedByMe, savedByMe, comments };
+  });
+}
+
 function getFeed(userId) {
   const db = getDb();
   const posts = db
@@ -37,19 +61,7 @@ function getFeed(userId) {
        ORDER BY p.created_at DESC, p.id DESC LIMIT 50`
     )
     .all();
-  return posts.map((p) => {
-    const likes = db.prepare("SELECT COUNT(*) AS c FROM likes WHERE post_id = ?").get(p.id).c;
-    const likedByMe = userId
-      ? !!db.prepare("SELECT id FROM likes WHERE post_id = ? AND user_id = ?").get(p.id, userId)
-      : false;
-    const comments = db
-      .prepare(
-        `SELECT c.*, u.name AS author_name FROM comments c
-         JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC`
-      )
-      .all(p.id);
-    return { ...p, likes, likedByMe, comments };
-  });
+  return enrichPosts(db, posts, userId);
 }
 
 // Stories row — real members with recent posts only (latest post first).
@@ -66,6 +78,104 @@ function getStories() {
     )
     .all()
     .map((m) => ({ id: m.id, name: m.name, profile_pic: m.profile_pic }));
+}
+
+// Suggested for you — real members (newest first), with real data only:
+// post count + member-since. No follow system exists, so the action is
+// Message (opens a one-to-one chat), never Follow.
+function getSuggestedMembers(userId) {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT u.id, u.name, u.profile_pic, u.created_at,
+       (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS post_count
+       FROM users u WHERE u.id != ? ORDER BY u.created_at DESC LIMIT 5`
+    )
+    .all(userId)
+    .map((m) => ({ id: m.id, name: m.name, profile_pic: m.profile_pic, created_at: m.created_at, post_count: m.post_count }));
+}
+
+// Suggested Posts — real posts from OTHER members (newest first).
+// Shown below "You're all caught up", like Instagram's section.
+function getSuggestedPosts(userId) {
+  const db = getDb();
+  const posts = db
+    .prepare(
+      `SELECT p.*, u.id AS author_id, u.name AS author_name, u.profile_pic AS author_pic
+       FROM posts p JOIN users u ON u.id = p.user_id
+       WHERE p.user_id != ? ORDER BY p.created_at DESC, p.id DESC LIMIT 6`
+    )
+    .all(userId);
+  return enrichPosts(db, posts, userId);
+}
+
+// One Instagram post card — used by the feed and by Suggested Posts.
+function PostCardIG({ p }) {
+  return (
+    <article className="ig-post" id={`post-${p.id}`}>
+      <div className="ig-post-head">
+        {/* Author name + picture link to their profile page. */}
+        <Link href={`/members/${p.author_id}`} aria-label={`${p.author_name}'s profile`}>
+          <span className="avatar">
+            {p.author_pic ? <img src={p.author_pic} alt={p.author_name} /> : p.author_name[0]}
+          </span>
+        </Link>
+        <div className="who">
+          <Link href={`/members/${p.author_id}`}><b>{p.author_name}</b></Link>
+          <span>{timeAgo(p.created_at)}</span>
+        </div>
+        <span className="ig-dots" aria-hidden="true">•••</span>
+      </div>
+      {/* Media — big photo, Drive video, or a styled text card. */}
+      {p.image_path ? (
+        <div className="ig-media"><img src={p.image_path} alt="Post picture" loading="lazy" /></div>
+      ) : p.drive_file_id ? (
+        <div className="ig-media"><DrivePlayer fileId={p.drive_file_id} /></div>
+      ) : p.text ? (
+        <div className="ig-text-media"><p>{p.text}</p></div>
+      ) : null}
+      <div className="ig-actions">
+        <form action="/api/community/like" method="post" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input type="hidden" name="post_id" value={p.id} />
+          <button type="submit" className={`ig-icon-btn ig-like-btn ${p.likedByMe ? "liked" : ""}`} aria-label={p.likedByMe ? "Unlike" : "Like"}>
+            {p.likedByMe ? "♥" : "♡"}
+          </button>
+          <span className="small" style={{ fontWeight: 700 }}>{p.likes}</span>
+        </form>
+        {/* The comment icon is a label for the add-comment box — tap focuses it. */}
+        <label htmlFor={`ig-comment-${p.id}`} className="ig-icon-btn" aria-label="Comment" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+          💬<span className="small" style={{ fontWeight: 700 }}>{p.comments.length}</span>
+        </label>
+        <IgShareButton postId={p.id} />
+        {/* Bookmark (save) — a real save, listed on your own profile. */}
+        <form action="/api/community/save" method="post" style={{ marginLeft: "auto" }}>
+          <input type="hidden" name="post_id" value={p.id} />
+          <button type="submit" className={`ig-icon-btn ig-save-btn ${p.savedByMe ? "saved" : ""}`} aria-label={p.savedByMe ? "Remove bookmark" : "Save post"}>
+            🔖
+          </button>
+        </form>
+      </div>
+      <div className="ig-likes">{p.likes} like{p.likes === 1 ? "" : "s"}</div>
+      {p.text && (p.image_path || p.drive_file_id) ? (
+        <div className="ig-caption"><b>{p.author_name}</b>{p.text}</div>
+      ) : null}
+      {p.comments.length > 0 ? (
+        <div className="ig-comments">
+          {p.comments.map((c) => (
+            <div className="ig-comment" key={c.id}>
+              <b>{c.author_name}</b>
+              {c.text} <span className="muted">{timeAgo(c.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <form action="/api/community/comment" method="post" className="ig-add-comment">
+        <input type="hidden" name="post_id" value={p.id} />
+        <input id={`ig-comment-${p.id}`} name="text" placeholder="Add a comment…" maxLength={2000} required />
+        <button type="submit">Post</button>
+      </form>
+    </article>
+  );
 }
 
 export default async function CommunityPage({ searchParams }) {
@@ -95,25 +205,48 @@ export default async function CommunityPage({ searchParams }) {
 
   const feed = getFeed(user.id);
   const stories = getStories();
-  const me = { name: user.name, profile_pic: user.profile_pic };
+  const suggestedMembers = getSuggestedMembers(user.id);
+  const suggestedPosts = getSuggestedPosts(user.id);
+  const me = { id: user.id, name: user.name, profile_pic: user.profile_pic };
 
   return (
-    <div className="wrap section">
-      <p className="muted small">HOME › PREMIUM LIVE TRADE COMMUNITY</p>
+    <div className="ig-shell">
+      {/* Left rail — Instagram navigation, only real features. */}
+      <aside className="ig-rail">
+        <Link href="/" className="ig-rail-logo" aria-label="LearnChart FX — Home">
+          <span className="mark">LC</span>
+          <span className="name">LEARNCHART <span>FX</span></span>
+        </Link>
+        <Link href="/" className="ig-rail-item"><span className="ic">⌂</span><span className="lbl">Home</span></Link>
+        <Link href="/community" className="ig-rail-item active" aria-current="page"><span className="ic">▦</span><span className="lbl">Community</span></Link>
+        <Link href="#special-chat" className="ig-rail-item"><span className="ic">⭐</span><span className="lbl">Special Chat</span></Link>
+        <Link href="/chat" className="ig-rail-item"><span className="ic">✈</span><span className="lbl">Messages</span></Link>
+        <Link href="#create-post" className="ig-rail-item"><span className="ic">＋</span><span className="lbl">Create</span></Link>
+        <Link href={`/members/${me.id}`} className="ig-rail-item">
+          <span className="avatar">{me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}</span>
+          <span className="lbl">Profile</span>
+        </Link>
+        <div className="ig-rail-spacer" />
+        <Link href="/profile" className="ig-rail-item"><span className="ic">☰</span><span className="lbl">More</span></Link>
+      </aside>
 
-      {/* Instagram: one centered ~470px column — stories, composer, feed. */}
-      <div className="ig-feed">
-        <div className="ig-top">
-          <h1>Community</h1>
-          <span className="badge badge-green">🔓 Unlocked</span>
-        </div>
+      <div className="ig-main">
+        {/* Center feed column. */}
+        <div className="ig-feed-col">
+          {sp?.error ? <div className="alert alert-error">{sp.error}</div> : null}
+          {sp?.posted === "1" ? <div className="alert alert-ok">Your post is live in the feed.</div> : null}
 
-        {sp?.error ? <div className="alert alert-error">{sp.error}</div> : null}
-        {sp?.posted === "1" ? <div className="alert alert-ok">Your post is live in the feed.</div> : null}
-
-        {/* Stories — members with recent posts; tap opens their profile. */}
-        {stories.length > 0 ? (
+          {/* Stories — "Your story" first, then members with recent posts. */}
           <div className="ig-stories">
+            <Link href="#create-post" className="ig-story ig-story-own" aria-label="Your story — create a post">
+              <span className="ig-story-ring">
+                <span className="avatar">
+                  {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
+                </span>
+                <span className="ig-story-plus">+</span>
+              </span>
+              <span>Your story</span>
+            </Link>
             {stories.map((m) => (
               <Link key={m.id} href={`/members/${m.id}`} className="ig-story" aria-label={`${m.name}'s profile`}>
                 <span className="ig-story-ring">
@@ -125,90 +258,111 @@ export default async function CommunityPage({ searchParams }) {
               </Link>
             ))}
           </div>
-        ) : null}
 
-        {/* Composer — photo first, Instagram Create style. */}
-        <IgComposer me={me} />
+          {/* Composer — photo first, Instagram Create style. */}
+          <div id="create-post">
+            <IgComposer me={me} />
+          </div>
 
-        {/* Feed — newest first, Instagram post cards. */}
-        {feed.length === 0 ? (
-          <div className="card center"><p className="muted">No posts yet — be the first to share a lesson or ask for help.</p></div>
-        ) : null}
-        {feed.map((p) => (
-          <article className="ig-post" id={`post-${p.id}`} key={p.id}>
-            <div className="ig-post-head">
-              {/* Author name + picture link to their profile page. */}
-              <Link href={`/members/${p.author_id}`} aria-label={`${p.author_name}'s profile`}>
+          {/* Feed — newest first, Instagram post cards. */}
+          {feed.length === 0 ? (
+            <div className="card center"><p className="muted">No posts yet — be the first to share a lesson or ask for help.</p></div>
+          ) : null}
+          {feed.map((p) => (
+            <PostCardIG key={p.id} p={p} />
+          ))}
+
+          {/* End of feed — "You're all caught up". */}
+          {feed.length > 0 ? (
+            <div className="ig-caughtup">
+              <div className="tick">✓</div>
+              <h3>You&apos;re all caught up</h3>
+              <p>You&apos;ve seen all the latest posts.</p>
+            </div>
+          ) : null}
+
+          {/* Suggested Posts — real posts from other members. */}
+          {suggestedPosts.length > 0 ? (
+            <div className="ig-suggested">
+              <h2>Suggested Posts</h2>
+              {suggestedPosts.map((p) => (
+                <PostCardIG key={p.id} p={p} />
+              ))}
+            </div>
+          ) : null}
+
+          {/* Mentor Special Chat — below the feed, DM style. */}
+          <div className="card" id="special-chat" style={{ marginBottom: 16, marginTop: 24 }}>
+            <h3>⭐ Mentor Special Chat</h3>
+            <SpecialChat />
+          </div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3>💬 Member Chat</h3>
+            <p className="small muted">
+              Chat one-to-one with other members in a separate chat box — pick a member and talk.
+            </p>
+            <Link href="/chat" className="btn btn-amber btn-sm">Open Chat →</Link>
+          </div>
+          <div className="card">
+            <h3>Quick links</h3>
+            <p><Link href="/live-room" className="amber">🔴 Live Room →</Link></p>
+            <p><Link href="/consultation" className="amber">🎧 My Consultations →</Link></p>
+            <p><Link href="/course-videos" className="amber">🎓 My Course Videos →</Link></p>
+          </div>
+        </div>
+
+        {/* Right panel — own profile + Suggested for you. */}
+        <aside className="ig-side">
+          <div className="ig-side-card">
+            <Link href={`/members/${me.id}`} aria-label="Your profile">
+              <span className="avatar">
+                {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
+              </span>
+            </Link>
+            <div className="who">
+              <Link href={`/members/${me.id}`}><b>{me.name}</b></Link>
+              <span>LearnChart FX member</span>
+            </div>
+            {/* Switch accounts from your profile (log out, log in as another). */}
+            <Link href="/profile" className="ig-switch">Switch</Link>
+          </div>
+          <div className="ig-side-head">
+            <b>Suggested for you</b>
+            <Link href="/chat">See all</Link>
+          </div>
+          {suggestedMembers.length === 0 ? (
+            <p className="small muted">No other members yet.</p>
+          ) : null}
+          {suggestedMembers.map((m) => (
+            <div className="ig-sugg-row" key={m.id}>
+              <Link href={`/members/${m.id}`} aria-label={`${m.name}'s profile`}>
                 <span className="avatar">
-                  {p.author_pic ? <img src={p.author_pic} alt={p.author_name} /> : p.author_name[0]}
+                  {m.profile_pic ? <img src={m.profile_pic} alt={m.name} /> : m.name[0]}
                 </span>
               </Link>
               <div className="who">
-                <Link href={`/members/${p.author_id}`}><b>{p.author_name}</b></Link>
-                <span>{timeAgo(p.created_at)}</span>
+                <Link href={`/members/${m.id}`}><b>{m.name}</b></Link>
+                <span>{m.post_count} post{m.post_count === 1 ? "" : "s"} · Member since {new Date(m.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}</span>
               </div>
-              <span className="ig-dots" aria-hidden="true">•••</span>
+              <Link href={`/chat?with=${m.id}`} className="ig-msg-btn">Message</Link>
             </div>
-            {/* Media — big photo, Drive video, or a styled text card. */}
-            {p.image_path ? (
-              <div className="ig-media"><img src={p.image_path} alt="Post picture" loading="lazy" /></div>
-            ) : p.drive_file_id ? (
-              <div className="ig-media"><DrivePlayer fileId={p.drive_file_id} /></div>
-            ) : p.text ? (
-              <div className="ig-text-media"><p>{p.text}</p></div>
-            ) : null}
-            <div className="ig-actions">
-              <form action="/api/community/like" method="post">
-                <input type="hidden" name="post_id" value={p.id} />
-                <button type="submit" className={`ig-icon-btn ig-like-btn ${p.likedByMe ? "liked" : ""}`} aria-label={p.likedByMe ? "Unlike" : "Like"}>
-                  {p.likedByMe ? "♥" : "♡"}
-                </button>
-              </form>
-              {/* The comment icon is a label for the add-comment box — tap focuses it. */}
-              <label htmlFor={`ig-comment-${p.id}`} className="ig-icon-btn" aria-label="Comment" style={{ cursor: "pointer" }}>💬</label>
-              <IgShareButton postId={p.id} />
-            </div>
-            <div className="ig-likes">{p.likes} like{p.likes === 1 ? "" : "s"}</div>
-            {p.text && (p.image_path || p.drive_file_id) ? (
-              <div className="ig-caption"><b>{p.author_name}</b>{p.text}</div>
-            ) : null}
-            {p.comments.length > 0 ? (
-              <div className="ig-comments">
-                {p.comments.map((c) => (
-                  <div className="ig-comment" key={c.id}>
-                    <b>{c.author_name}</b>
-                    {c.text} <span className="muted">{timeAgo(c.created_at)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <form action="/api/community/comment" method="post" className="ig-add-comment">
-              <input type="hidden" name="post_id" value={p.id} />
-              <input id={`ig-comment-${p.id}`} name="text" placeholder="Add a comment…" maxLength={2000} required />
-              <button type="submit">Post</button>
-            </form>
-          </article>
-        ))}
-
-        {/* Mentor Special Chat — below the feed, DM style. */}
-        <div className="card" style={{ marginBottom: 16 }}>
-          <h3>⭐ Mentor Special Chat</h3>
-          <SpecialChat />
-        </div>
-        <div className="card" style={{ marginBottom: 16 }}>
-          <h3>💬 Member Chat</h3>
-          <p className="small muted">
-            Chat one-to-one with other members in a separate chat box — pick a member and talk.
-          </p>
-          <Link href="/chat" className="btn btn-amber btn-sm">Open Chat →</Link>
-        </div>
-        <div className="card">
-          <h3>Quick links</h3>
-          <p><Link href="/live-room" className="amber">🔴 Live Room →</Link></p>
-          <p><Link href="/consultation" className="amber">🎧 My Consultations →</Link></p>
-          <p><Link href="/course-videos" className="amber">🎓 My Course Videos →</Link></p>
-        </div>
+          ))}
+          <div className="ig-side-foot">
+            <Link href="/mentors">Mentors</Link> · <Link href="/courses">Courses</Link> · <Link href="/faq">FAQ</Link> · <Link href="/contact">Contact</Link>
+            <br />© 2026 LearnChart FX
+          </div>
+        </aside>
       </div>
+
+      {/* Floating Messages pill (desktop only). */}
+      <Link href="/chat" className="ig-msg-float">
+        ✈ Messages
+        {suggestedMembers.slice(0, 3).map((m) => (
+          <span key={m.id} className="avatar">
+            {m.profile_pic ? <img src={m.profile_pic} alt={m.name} /> : m.name[0]}
+          </span>
+        ))}
+      </Link>
     </div>
   );
 }

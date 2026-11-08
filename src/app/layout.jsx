@@ -30,7 +30,10 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
-        <Nav />
+        {/* The pill nav is wrapped so the Community page can hide it on
+            desktop widths: there the Instagram rail (inside the page)
+            is the navigation. See globals.css (.site-nav-wrap). */}
+        <div className="site-nav-wrap"><Nav /></div>
         <main>{children}</main>
         <Footer />
       </body>
