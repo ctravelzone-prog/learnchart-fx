@@ -1,18 +1,27 @@
 // ---------------------------------------------------------------------------
 // community/page.jsx — Community, Premium Live Trade Everyday (Sec 16).
 // ONE shared community for every member. Gate (server-side, via
-// access.js): any enrollment unlocks it; everyone else sees the locked
-// preview naming exactly which enrollments unlock it.
+// access.js): an ACTIVE PAID enrollment unlocks it (Forex $250 or
+// unexpired Private Live Trade $200/month — Nov 2026, Siam's order);
+// everyone else sees the locked preview naming exactly which paid
+// programs unlock it. A free Consultation enrollment alone does NOT
+// open the Community.
 //
-// LOOK (Nov 2026, Siam's screenshots of real Instagram desktop): the
-// Instagram 3-column desktop layout, LearnChart dark theme + amber
-// accent — left rail (icon + labels on desktop, icons-only on tablets),
-// center ~470px feed column, right panel (own profile + Suggested for
-// you). Below the feed: "You're all caught up" + Suggested Posts.
-// STORIES (Nov 2026): real 24-hour stories at the top — one photo per
-// story, deleted from the server after 24 hours. COMPOSER (Nov 2026):
-// the big open Create card is gone — a small collapsed bar opens the
-// dedicated Create page (/community/create) instead.
+// LOOK (Nov 2026, Siam's Facebook screenshots — supersedes the earlier
+// Instagram direction for the feed): the Facebook home-feed layout in
+// the LearnChart dark theme + amber accent — rectangular story CARDS
+// on top (not circles), a Facebook composer bar ("What's on your
+// mind, <FirstName>?" + Live video / Photo/video / Reel buttons),
+// Facebook post cards (header with time · globe, caption, full-width
+// photo, counts row, Like / Comment / Share action row, Save in the
+// "..." menu), left rail navigation and the right panel (own profile
+// + Suggested for you). No fake Sponsored ads or Birthdays — we have
+// neither ads nor birthdays stored. Below the feed: "You're all
+// caught up" + Suggested Posts. STORIES (Nov 2026): real 24-hour
+// stories — tapping a story card opens the dedicated stories page
+// (/community/stories?user=<id>). COMPOSER (Nov 2026): clicking the
+// text field opens the Create Post modal; the full composer lives on
+// its own page (/community/create).
 // No separate login inside the community: members reaching this page
 // are already logged in — the enrollment locked preview is the only
 // gate. Only real features are linked: Home, Community, Special Chat,
@@ -26,13 +35,15 @@
 import Link from "next/link";
 import { getDb } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
-import { canEnterCommunity } from "../../lib/access.js";
-import { getLiveStoryGroups } from "../../lib/stories.js";
+import { getCommunityAccessState } from "../../lib/access.js";
+import { getStoryGroupsFor } from "../../lib/stories.js";
 import { timeAgo } from "../../lib/utils.js";
-import LockedPreview from "../../components/LockedPreview.jsx";
+import { bgCssFor } from "../../lib/post-colors.js";
+import CommunityLockedPreview from "../../components/CommunityLockedPreview.jsx";
 import DrivePlayer from "../../components/DrivePlayer.jsx";
 import IgRail from "../../components/IgRail.jsx";
-import { IgStories, IgShareButton } from "../../components/CommunityClient.jsx";
+import FbComposer from "../../components/FbComposer.jsx";
+import { IgShareButton } from "../../components/CommunityClient.jsx";
 
 export const metadata = {
   title: "Community — Premium Live Trade Everyday — LearnChart FX",
@@ -40,10 +51,11 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-// Likes / liked-by-me / saved-by-me / comments for a list of post rows.
+// Likes / liked-by-me / saved-by-me / shares / comments for a list of post rows.
 function enrichPosts(db, rows, userId) {
   return rows.map((p) => {
     const likes = db.prepare("SELECT COUNT(*) AS c FROM likes WHERE post_id = ?").get(p.id).c;
+    const shares = db.prepare("SELECT COUNT(*) AS c FROM post_shares WHERE post_id = ?").get(p.id).c;
     const likedByMe = userId
       ? !!db.prepare("SELECT id FROM likes WHERE post_id = ? AND user_id = ?").get(p.id, userId)
       : false;
@@ -56,7 +68,7 @@ function enrichPosts(db, rows, userId) {
          JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC`
       )
       .all(p.id);
-    return { ...p, likes, likedByMe, savedByMe, comments };
+    return { ...p, likes, shares, likedByMe, savedByMe, comments };
   });
 }
 
@@ -106,11 +118,25 @@ function getSuggestedPosts(userId) {
   return enrichPosts(db, posts, userId);
 }
 
-// One Instagram post card — used by the feed and by Suggested Posts.
-function PostCardIG({ p }) {
+// One Facebook post card — used by the feed and by Suggested Posts
+// (Nov 2026, Siam's Facebook screenshots — supersedes the Instagram
+// card). Header: avatar, name, time · audience globe (no location —
+// we don't store one). Caption, then full-width photo (or Drive
+// video, or — for a text-only post with a background color from the
+// Create Post modal's "Aa" palette — the text on that colored
+// background). Then a counts row (real like / comment / share totals,
+// shown only when a count is above zero), then the action row: Like
+// (thumbs-up, fills blue when liked), Comment (bubble — focuses the
+// add-comment box), Share (arrow — records one real share AND copies
+// the post link, "Link copied" feedback). Save lives in the top-right
+// "..." menu (a real, working save — listed on your own profile).
+// All like/comment/share/save behavior is unchanged; only the
+// presentation changed.
+function PostCardFB({ p }) {
+  const hasBg = p.bg_color && !p.image_path && !p.drive_file_id;
   return (
-    <article className="ig-post" id={`post-${p.id}`}>
-      <div className="ig-post-head">
+    <article className="fb-post" id={`post-${p.id}`}>
+      <div className="fb-post-head">
         {/* Author name + picture link to their profile page. */}
         <Link href={`/members/${p.author_id}`} aria-label={`${p.author_name}'s profile`}>
           <span className="avatar">
@@ -119,62 +145,81 @@ function PostCardIG({ p }) {
         </Link>
         <div className="who">
           <Link href={`/members/${p.author_id}`}><b>{p.author_name}</b></Link>
-          <span>{timeAgo(p.created_at)}</span>
+          <span>
+            {timeAgo(p.created_at)} ·{" "}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ verticalAlign: "-1px" }}><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm7.9 6h-3.4a15.6 15.6 0 0 0-1.2-3.5A8.03 8.03 0 0 1 19.9 8zM12 4.1c.8 1 1.5 2.4 1.9 3.9h-3.8c.4-1.5 1.1-2.9 1.9-3.9zM4.1 8a8.03 8.03 0 0 1 4.6-3.5A15.6 15.6 0 0 0 7.5 8H4.1zM4.1 10h3.7c.1 1.4.4 2.7.9 3.9A8.1 8.1 0 0 1 4.1 10zm4.9 0h6c-.1 1.3-.5 2.7-1 3.9h-4c-.5-1.2-.9-2.6-1-3.9zm7.2 0h3.7a8.1 8.1 0 0 1-4.6 3.9c.5-1.2.8-2.5.9-3.9zM12 19.9c-.8-1-1.5-2.4-1.9-3.9h3.8c-.4-1.5-1.1-2.9-1.9-3.9zm-3.3-1.4a15.6 15.6 0 0 0 1.2 3.5 8.03 8.03 0 0 1-4.6-3.5h3.4zm7.9 0a8.03 8.03 0 0 1-4.6 3.5c.5-1.1.9-2.3 1.2-3.5h3.4z" /></svg>
+          </span>
         </div>
-        <span className="ig-dots" aria-hidden="true">•••</span>
+        {/* "..." menu — Save lives here (real and working). */}
+        <details className="fb-menu">
+          <summary aria-label="More options">•••</summary>
+          <div className="fb-menu-list">
+            <form action="/api/community/save" method="post">
+              <input type="hidden" name="post_id" value={p.id} />
+              <button type="submit">{p.savedByMe ? "Remove bookmark" : "Save post"}</button>
+            </form>
+          </div>
+        </details>
       </div>
-      {/* Media — big photo, Drive video, or a styled text card. */}
-      {p.image_path ? (
-        <div className="ig-media"><img src={p.image_path} alt="Post picture" loading="lazy" /></div>
-      ) : p.drive_file_id ? (
-        <div className="ig-media"><DrivePlayer fileId={p.drive_file_id} /></div>
-      ) : p.text ? (
-        <div className="ig-text-media"><p>{p.text}</p></div>
+      {/* Caption — above the media, Facebook style. A text-only post
+          with a background color renders on that color. */}
+      {p.text && !hasBg ? (
+        <div className="fb-caption"><p>{p.text}</p></div>
       ) : null}
-      {/* Action row — Instagram-style SVG outline icons (Nov 2026, no
-          emoji here): heart (fills red when liked), comment bubble
-          (tap focuses the add-comment box), paper-plane share (copies
-          the post link), bookmark (fills amber when saved). Counts stay
-          next to the icons; all behavior is unchanged. */}
-      <div className="ig-actions">
-        <form action="/api/community/like" method="post" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {/* Media — big photo, Drive video, or a colored text block. */}
+      {p.image_path ? (
+        <div className="fb-media"><img src={p.image_path} alt="Post picture" loading="lazy" /></div>
+      ) : p.drive_file_id ? (
+        <div className="fb-media"><DrivePlayer fileId={p.drive_file_id} /></div>
+      ) : hasBg ? (
+        <div className="fb-bg-text" style={{ background: bgCssFor(p.bg_color) }}><p>{p.text}</p></div>
+      ) : null}
+      {/* Counts row — real totals, only when above zero. */}
+      {p.likes > 0 || p.comments.length > 0 || p.shares > 0 ? (
+        <div className="fb-counts">
+          <span>
+            {p.likes > 0 ? (
+              <>
+                <span className="fb-count-like">👍</span> {p.likes}
+              </>
+            ) : null}
+          </span>
+          <span>
+            {p.comments.length > 0 ? `${p.comments.length} comment${p.comments.length === 1 ? "" : "s"}` : ""}
+            {p.comments.length > 0 && p.shares > 0 ? " · " : ""}
+            {p.shares > 0 ? `${p.shares} share${p.shares === 1 ? "" : "s"}` : ""}
+          </span>
+        </div>
+      ) : null}
+      {/* Action row — Like / Comment / Share. */}
+      <div className="fb-actions">
+        <form action="/api/community/like" method="post" className="fb-action-form">
           <input type="hidden" name="post_id" value={p.id} />
-          <button type="submit" className={`ig-icon-btn ig-like-btn ${p.likedByMe ? "liked" : ""}`} aria-label={p.likedByMe ? "Unlike" : "Like"}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill={p.likedByMe ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+          <button type="submit" className={`fb-action-btn ${p.likedByMe ? "liked" : ""}`} aria-label={p.likedByMe ? "Unlike" : "Like"}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill={p.likedByMe ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z" /><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
+            Like
           </button>
-          <span className="small" style={{ fontWeight: 700 }}>{p.likes}</span>
         </form>
-        {/* The comment icon is a label for the add-comment box — tap focuses it. */}
-        <label htmlFor={`ig-comment-${p.id}`} className="ig-icon-btn" aria-label="Comment" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
-          <span className="small" style={{ fontWeight: 700 }}>{p.comments.length}</span>
+        {/* The comment button is a label for the add-comment box — tap focuses it. */}
+        <label htmlFor={`fb-comment-${p.id}`} className="fb-action-btn" aria-label="Comment" style={{ cursor: "pointer" }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+          Comment
         </label>
         <IgShareButton postId={p.id} />
-        {/* Bookmark (save) — a real save, listed on your own profile. */}
-        <form action="/api/community/save" method="post" style={{ marginLeft: "auto" }}>
-          <input type="hidden" name="post_id" value={p.id} />
-          <button type="submit" className={`ig-icon-btn ig-save-btn ${p.savedByMe ? "saved" : ""}`} aria-label={p.savedByMe ? "Remove bookmark" : "Save post"}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill={p.savedByMe ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
-          </button>
-        </form>
       </div>
-      <div className="ig-likes">{p.likes} like{p.likes === 1 ? "" : "s"}</div>
-      {p.text && (p.image_path || p.drive_file_id) ? (
-        <div className="ig-caption"><b>{p.author_name}</b>{p.text}</div>
-      ) : null}
       {p.comments.length > 0 ? (
-        <div className="ig-comments">
+        <div className="fb-comments">
           {p.comments.map((c) => (
-            <div className="ig-comment" key={c.id}>
+            <div className="fb-comment" key={c.id}>
               <b>{c.author_name}</b>
               {c.text} <span className="muted">{timeAgo(c.created_at)}</span>
             </div>
           ))}
         </div>
       ) : null}
-      <form action="/api/community/comment" method="post" className="ig-add-comment">
+      <form action="/api/community/comment" method="post" className="fb-add-comment">
         <input type="hidden" name="post_id" value={p.id} />
-        <input id={`ig-comment-${p.id}`} name="text" placeholder="Add a comment…" maxLength={2000} required />
+        <input id={`fb-comment-${p.id}`} name="text" placeholder="Write a comment…" maxLength={2000} required />
         <button type="submit">Post</button>
       </form>
     </article>
@@ -186,31 +231,33 @@ export default async function CommunityPage({ searchParams }) {
   const sp = await searchParams;
   const user = await getSessionUser();
 
-  // Gate: any enrollment unlocks the Community (access.js).
-  if (!user || !canEnterCommunity(user.id)) {
+  // Gate: PAID-ONLY (Nov 2026, Siam's order) — an active paid
+  // enrollment (Forex $250 or unexpired Private Live Trade $200/month).
+  // Consultation-only and non-enrolled visitors see the locked preview
+  // naming the paid programs (and Renew, when a subscription lapsed).
+  const communityAccess = getCommunityAccessState(user?.id);
+  if (!user || communityAccess.state !== "open") {
     return (
       <div className="wrap section">
         <p className="muted small">HOME › PREMIUM LIVE TRADE COMMUNITY</p>
         <h1 style={{ fontSize: 36 }}>Premium Live Trade <span className="amber">Everyday — Community</span></h1>
-        <LockedPreview
-          title="🔒 Members-Only Community"
-          text="The Premium Live Trade community — feed, posts, likes, comments, member chat and the Mentor Special Chat — is only for members who have purchased a course or a service. Enroll in any program to unlock it."
-          unlocks="Unlocks with: any enrollment (any course or service)"
-          buttons={[
-            { href: "/enroll/forex-premium-course", label: "Enroll — Premium Course $250", style: "btn-amber" },
-            { href: "/enroll/private-live-trade", label: "Join Private Live Trade — $200", style: "btn-dark" },
-            { href: "/enroll/trading-consultation", label: "Consultation — Free", style: "btn-dark" },
-          ]}
+        <CommunityLockedPreview
+          access={communityAccess}
+          description="The Premium Live Trade community — feed, posts, likes, comments, member chat and the Mentor Special Chat"
         />
       </div>
     );
   }
 
   const feed = getFeed(user.id);
-  const storyGroups = getLiveStoryGroups();
+  const storyGroups = getStoryGroupsFor(user.id);
   const suggestedMembers = getSuggestedMembers(user.id);
   const suggestedPosts = getSuggestedPosts(user.id);
   const me = { id: user.id, name: user.name, profile_pic: user.profile_pic };
+  // Story cards need the viewer's own group (latest story photo) + the
+  // others, in the same order as the stories page list.
+  const myStoryGroup = storyGroups.find((g) => g.user_id === me.id) || null;
+  const otherStoryGroups = storyGroups.filter((g) => g.user_id !== me.id);
 
   return (
     <div className="ig-shell">
@@ -224,26 +271,71 @@ export default async function CommunityPage({ searchParams }) {
           {sp?.posted === "1" ? <div className="alert alert-ok">Your post is live in the feed.</div> : null}
           {sp?.story === "1" ? <div className="alert alert-ok">Your story is live for 24 hours — then it disappears automatically.</div> : null}
 
-          {/* Stories — real 24-hour stories (tap a circle = viewer). */}
-          <IgStories groups={storyGroups} me={me} />
+          {/* Stories — rectangular Facebook story CARDS (Nov 2026,
+              supersedes the Instagram circles). First card: "Create
+              story" (your photo + big + button → the Story tab).
+              Then "Your story" (your latest story photo, or your
+              photo when you have none). Then one card per member with
+              a live story: their story photo as the card image, avatar
+              with a BLUE ring (unseen stories) or GREY ring (all seen)
+              at the top, name at the bottom. Tapping a card opens the
+              dedicated stories page for that person. */}
+          <div className="fb-stories-row">
+            <Link href="/community/create?tab=story" className="fb-story-card fb-story-create" aria-label="Create a story">
+              <span className="fb-story-card-img">
+                {me.profile_pic ? <img src={me.profile_pic} alt="" /> : <span className="fb-story-card-blank" />}
+              </span>
+              <span className="fb-story-create-plus">+</span>
+              <span className="fb-story-card-name">Create story</span>
+            </Link>
+            <Link
+              href={myStoryGroup ? `/community/stories?user=${me.id}` : "/community/create?tab=story"}
+              className="fb-story-card"
+              aria-label="Your story"
+            >
+              <span className="fb-story-card-img">
+                {myStoryGroup ? (
+                  <img src={myStoryGroup.stories[myStoryGroup.stories.length - 1].image_path} alt="" />
+                ) : me.profile_pic ? (
+                  <img src={me.profile_pic} alt="" />
+                ) : (
+                  <span className="fb-story-card-blank" />
+                )}
+              </span>
+              <span className={`fb-story-card-avatar ${myStoryGroup ? "seen" : ""}`}>
+                <span className="avatar">
+                  {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
+                </span>
+              </span>
+              <span className="fb-story-card-name">Your story</span>
+            </Link>
+            {otherStoryGroups.map((g) => (
+              <Link key={g.user_id} href={`/community/stories?user=${g.user_id}`} className="fb-story-card" aria-label={`${g.name}'s stories`}>
+                <span className="fb-story-card-img">
+                  <img src={g.stories[g.stories.length - 1].image_path} alt="" />
+                </span>
+                {/* Blue ring = unseen stories; grey ring = all seen. */}
+                <span className={`fb-story-card-avatar ${g.unseen > 0 ? "unseen" : "seen"}`}>
+                  <span className="avatar">
+                    {g.profile_pic ? <img src={g.profile_pic} alt={g.name} /> : g.name[0]}
+                  </span>
+                </span>
+                <span className="fb-story-card-name">{g.name}</span>
+              </Link>
+            ))}
+          </div>
 
-          {/* Composer — collapsed bar (Instagram/Facebook style). The full
-              composer lives on its own page (/community/create); the big
-              open card at the top of the feed is gone. */}
-          <Link href="/community/create" className="ig-composer-bar" aria-label="Create a post">
-            <span className="avatar">
-              {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
-            </span>
-            <span className="ig-composer-bar-text">Create a post…</span>
-            <span className="ig-composer-bar-photo" aria-hidden="true">📷</span>
-          </Link>
+          {/* Composer — Facebook bar + Create Post modal (Nov 2026).
+              The text field opens the modal; Live video / Photo/video /
+              Reel go to their real destinations. */}
+          <FbComposer me={me} returnTo="/community" />
 
-          {/* Feed — newest first, Instagram post cards. */}
+          {/* Feed — newest first, Facebook post cards. */}
           {feed.length === 0 ? (
             <div className="card center"><p className="muted">No posts yet — be the first to share a lesson or ask for help.</p></div>
           ) : null}
           {feed.map((p) => (
-            <PostCardIG key={p.id} p={p} />
+            <PostCardFB key={p.id} p={p} />
           ))}
 
           {/* End of feed — "You're all caught up". */}
@@ -260,7 +352,7 @@ export default async function CommunityPage({ searchParams }) {
             <div className="ig-suggested">
               <h2>Suggested Posts</h2>
               {suggestedPosts.map((p) => (
-                <PostCardIG key={p.id} p={p} />
+                <PostCardFB key={p.id} p={p} />
               ))}
             </div>
           ) : null}

@@ -4,8 +4,8 @@
 // 10 per submit — same rules as profile pictures). Each photo becomes
 // one story row expiring 24 hours after upload; the file is saved under
 // public/uploads/stories/ so the existing /api/files serving + /uploads
-// rewrite displays it. Only community members (any enrollment) can
-// post. VIDEO UPLOAD IS NOT ALLOWED — stories are photos only.
+// rewrite displays it. Only PAID community members (an active paid
+// enrollment — Nov 2026, Siam's order) can post. VIDEO UPLOAD IS NOT
 // GET: live stories grouped by author as JSON (for the story viewer).
 // Every read filters expires_at > now AND deletes expired rows + files
 // first (src/lib/stories.js), so an expired story is never visible.

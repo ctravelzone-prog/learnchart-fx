@@ -10,9 +10,14 @@
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { timeAgo } from "../lib/utils.js";
+import { bgCssFor } from "../lib/post-colors.js";
 import DrivePlayer from "./DrivePlayer.jsx";
 
 export default function PostCard({ post, authorName, authorPic, authorId }) {
+  // A text-only post with a background color (from the Create Post
+  // modal's "Aa" palette) renders on that color; anything else keeps
+  // the plain text card.
+  const hasBg = post.bg_color && !post.image_path && !post.drive_file_id;
   return (
     <article className="ig-post" id={`post-${post.id}`}>
       <div className="ig-post-head">
@@ -32,7 +37,7 @@ export default function PostCard({ post, authorName, authorPic, authorId }) {
       ) : post.drive_file_id ? (
         <div className="ig-media"><DrivePlayer fileId={post.drive_file_id} /></div>
       ) : post.text ? (
-        <div className="ig-text-media"><p>{post.text}</p></div>
+        <div className="ig-text-media" style={hasBg ? { background: bgCssFor(post.bg_color) } : undefined}><p>{post.text}</p></div>
       ) : null}
       <div className="ig-likes">{post.likes} like{post.likes === 1 ? "" : "s"}</div>
       {post.text && (post.image_path || post.drive_file_id) ? (

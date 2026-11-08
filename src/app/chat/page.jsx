@@ -2,15 +2,16 @@
 // chat/page.jsx — Member Chat, its own page (Nov 2026: Siam asked for a
 // separate chat box, not a small card buried in the Community sidebar).
 // Member list on one side, one-to-one conversation on the other — the
-// picked member comes from ?with=<id>. Members only: the viewer must be
-// logged in and enrolled (same gate as the Community); everyone else
-// sees the locked preview. Gated page: noindex.
+// picked member comes from ?with=<id>. Paid members only: the viewer
+// must be logged in with an ACTIVE PAID enrollment (same gate as the
+// Community — Nov 2026, Siam's order); everyone else sees the locked
+// preview. Gated page: noindex.
 // ---------------------------------------------------------------------------
 import { redirect } from "next/navigation";
 import { getDb } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
-import { canEnterCommunity } from "../../lib/access.js";
-import LockedPreview from "../../components/LockedPreview.jsx";
+import { getCommunityAccessState } from "../../lib/access.js";
+import CommunityLockedPreview from "../../components/CommunityLockedPreview.jsx";
 import ChatRoom from "../../components/ChatRoom.jsx";
 
 export const metadata = {
@@ -24,20 +25,16 @@ export default async function ChatPage({ searchParams }) {
   const sp = await searchParams;
   const user = await getSessionUser();
 
-  // Members only — same gate as the Community itself.
+  // Paid members only — same gate as the Community itself.
   if (!user) redirect("/login?next=/chat");
-  if (!canEnterCommunity(user.id)) {
+  const communityAccess = getCommunityAccessState(user.id);
+  if (communityAccess.state !== "open") {
     return (
       <div className="wrap section">
         <h1 style={{ fontSize: 36 }}>Member <span className="amber">Chat</span></h1>
-        <LockedPreview
-          title="🔒 Members-Only Chat"
-          text="Member chat is only for members who have purchased a course or a service. Enroll in any program to unlock the Community and chat one-to-one with other members."
-          unlocks="Unlocks with: any enrollment (any course or service)"
-          buttons={[
-            { href: "/enroll/forex-premium-course", label: "Enroll — Premium Course $250", style: "btn-amber" },
-            { href: "/enroll/private-live-trade", label: "Join Private Live Trade — $200", style: "btn-dark" },
-          ]}
+        <CommunityLockedPreview
+          access={communityAccess}
+          description="Member chat — chatting one-to-one with other members"
         />
       </div>
     );

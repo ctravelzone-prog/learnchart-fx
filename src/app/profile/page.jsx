@@ -10,7 +10,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDb, getEnrollments, isEnrollmentActive, displayPrice } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
+import { canEnterCommunity } from "../../lib/access.js";
 import PostCard from "../../components/PostCard.jsx";
+import FbComposer from "../../components/FbComposer.jsx";
 
 export const metadata = {
   title: "My Profile — LearnChart FX",
@@ -46,10 +48,17 @@ export default async function ProfilePage({ searchParams }) {
 
   const enrollments = getEnrollments(user.id);
   const myPosts = getMyPosts(user.id);
+  // The composer only shows for members who can actually post (an
+  // active PAID enrollment — Nov 2026 paid-only Community gate). A
+  // free Consultation enrollment alone never sees a dead composer.
+  const canPost = canEnterCommunity(user.id);
 
   // What this student can actually open right now (active, unexpired
   // enrollments only) — the quick links below show only real access.
-  const hasActiveEnrollment = enrollments.some((e) => isEnrollmentActive(e));
+  // Community is PAID-ONLY (Nov 2026): it shows only when the student
+  // holds an active PAID enrollment — a free Consultation enrollment
+  // alone does not open it.
+  const hasPaidEnrollment = enrollments.some((e) => isEnrollmentActive(e) && e.course_price_cents > 0);
   const hasLiveRoom = enrollments.some((e) => isEnrollmentActive(e) && e.course_unlocks === "live-room");
   const hasConsultation = enrollments.some((e) => isEnrollmentActive(e) && e.course_unlocks === "consultation");
   // SQLite stores datetimes as UTC "YYYY-MM-DD HH:MM:SS" — parse as
@@ -64,6 +73,7 @@ export default async function ProfilePage({ searchParams }) {
       {sp?.keymail === "resent" ? <div className="alert alert-ok">Your Course Key was emailed to {user.email} — check your Gmail inbox (and Spam folder).</div> : null}
       {sp?.keymail === "failed" ? <div className="alert alert-error">We could not send your Course Key email right now. Please try again in a little while.</div> : null}
       {sp?.keymail === "unconfigured" ? <div className="alert alert-info">Email service is not connected yet — your key will be emailed once the site owner connects email.</div> : null}
+      {sp?.posted === "1" ? <div className="alert alert-ok">Your post is live — it shows at the top of your posts below.</div> : null}
       {sp?.error ? <div className="alert alert-error">{sp.error}</div> : null}
 
       <div className="grid-2">
@@ -175,13 +185,18 @@ export default async function ProfilePage({ searchParams }) {
           )}
           {/* Quick links — only the areas this student can actually open. */}
           <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-            {hasActiveEnrollment ? <Link href="/community" className="btn btn-dark btn-sm">Community</Link> : null}
+            {hasPaidEnrollment ? <Link href="/community" className="btn btn-dark btn-sm">Community</Link> : null}
             {hasLiveRoom ? <Link href="/live-room" className="btn btn-dark btn-sm">Live Room</Link> : null}
             {hasConsultation ? <Link href="/consultation" className="btn btn-dark btn-sm">Consultation</Link> : null}
             <Link href="/courses" className="btn btn-dark btn-sm">Browse Courses</Link>
           </div>
         </div>
       </div>
+
+      {/* The same Facebook composer as the Community feed (Nov 2026):
+          posting from here returns to /profile with the new post at
+          the top of your own posts. Only paid members see it. */}
+      {canPost ? <FbComposer me={{ id: user.id, name: user.name, profile_pic: user.profile_pic }} returnTo="/profile" /> : null}
 
       {/* My Posts / My Uploads — everything this user posted in the Community. */}
       <h2 style={{ marginTop: 32 }}>📤 My Posts / My Uploads</h2>

@@ -4,16 +4,17 @@
 // followers/following counts (they don't exist). Below, a 3-column square
 // grid of their posts/pictures; tap a tile to open that post in the
 // Community feed. Clicking any author's name or picture in the feed
-// opens their page here. Members only: the viewer must be logged in
-// and enrolled (same gate as the Community); everyone else sees the
-// locked preview. Gated page: noindex.
+// opens their page here. Paid members only: the viewer must be logged
+// in with an ACTIVE PAID enrollment (same gate as the Community — Nov
+// 2026, Siam's order); everyone else sees the locked preview.
+// Gated page: noindex.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getDb, getUserById } from "../../../lib/db.js";
 import { getSessionUser } from "../../../lib/auth.js";
-import { canEnterCommunity } from "../../../lib/access.js";
-import LockedPreview from "../../../components/LockedPreview.jsx";
+import { getCommunityAccessState } from "../../../lib/access.js";
+import CommunityLockedPreview from "../../../components/CommunityLockedPreview.jsx";
 
 export const metadata = {
   title: "Member Profile — LearnChart FX",
@@ -46,22 +47,18 @@ export default async function MemberProfilePage({ params }) {
   const memberId = Number(id);
   const user = await getSessionUser();
 
-  // Members only — same gate as the Community itself. No separate login
+  // Paid members only — same gate as the Community itself. No separate login
   // inside the community: members are already logged in; the locked
   // preview below is the only gate, for non-enrolled visitors.
   if (!user) redirect(`/login?next=/members/${id}`);
-  if (!canEnterCommunity(user.id)) {
+  const communityAccess = getCommunityAccessState(user.id);
+  if (communityAccess.state !== "open") {
     return (
       <div className="wrap section">
         <h1 style={{ fontSize: 36 }}>Member <span className="amber">Profile</span></h1>
-        <LockedPreview
-          title="🔒 Members-Only Community"
-          text="Member profiles are only for members who have purchased a course or a service. Enroll in any program to unlock the Community and see member profiles."
-          unlocks="Unlocks with: any enrollment (any course or service)"
-          buttons={[
-            { href: "/enroll/forex-premium-course", label: "Enroll — Premium Course $250", style: "btn-amber" },
-            { href: "/enroll/private-live-trade", label: "Join Private Live Trade — $200", style: "btn-dark" },
-          ]}
+        <CommunityLockedPreview
+          access={communityAccess}
+          description="Member profiles — seeing other members and their posts"
         />
       </div>
     );

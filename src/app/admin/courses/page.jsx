@@ -21,7 +21,7 @@ export default async function AdminCoursesPage({ searchParams }) {
       <p className="muted">
         A course added here appears on the Courses page and in the student dashboard immediately.
         <strong> Video lessons + key</strong> gives its students lessons and a unique emailed Course Key.
-        <strong> Unlocks</strong> opens the Live Room or Consultation for its students (Community is any enrollment).
+        <strong> Unlocks</strong> opens the Live Room or Consultation for its students (Community is paid-only — only a course with a price opens it).
       </p>
       {sp?.saved === "1" ? <div className="alert alert-ok">Saved.</div> : null}
       <p><Link href="/admin/courses/new" className="btn btn-amber">+ Add Course</Link></p>

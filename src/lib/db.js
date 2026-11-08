@@ -98,8 +98,10 @@ CREATE TABLE IF NOT EXISTS courses_services (
   -- Added with the master admin panel (Nov 2026): a course added from
   -- /admin can have video lessons + a Course Key (has_videos = 1) and
   -- can unlock an area (unlocks = 'none' | 'live-room' |
-  -- 'consultation'). Community stays "any enrollment" for every
-  -- course, so it needs no flag here. "image" is the card banner
+  -- 'consultation'). Community is PAID-ONLY (Nov 2026, Siam's order):
+  -- only an enrollment whose course costs money (price_cents > 0)
+  -- opens it, so it needs no flag here either — the gate in
+  -- src/lib/access.js reads the price. "image" is the card banner
   -- (uploaded from the admin course form); "badge" is the small ribbon
   -- on the card (e.g. "★ BESTSELLER", empty = none).
   has_videos INTEGER NOT NULL DEFAULT 0,
@@ -182,6 +184,11 @@ CREATE TABLE IF NOT EXISTS posts (
   image_path TEXT,
   drive_file_id TEXT,
   drive_url TEXT,
+  -- Background color key for TEXT-ONLY posts (Nov 2026, Facebook
+  -- "Aa" palette in the Create Post modal). One of the keys in
+  -- src/lib/post-colors.js, '' = no background. Only ever rendered
+  -- when the post has no photo and no Drive video.
+  bg_color TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -225,6 +232,34 @@ CREATE TABLE IF NOT EXISTS stories (
 );
 CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
 CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id);
+
+-- Story views (Nov 2026, Facebook stories page): one row per user per
+-- story — viewing the same story again never adds a second row. Powers
+-- the "N new" counts (stories the viewer has not seen yet), the blue
+-- (unseen) / grey (all seen) rings, and the viewers count + avatar
+-- stack under a story. Rows vanish with their story (ON DELETE
+-- CASCADE) and with their viewer.
+CREATE TABLE IF NOT EXISTS story_views (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  viewed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (story_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_story_views_story ON story_views(story_id);
+CREATE INDEX IF NOT EXISTS idx_story_views_user ON story_views(user_id);
+
+-- Post shares (Nov 2026, Facebook feed): one row per share action.
+-- The Share button records a share AND copies the post link; the
+-- counts row under a post shows the real total. Rows vanish with
+-- their post (ON DELETE CASCADE) and with their user.
+CREATE TABLE IF NOT EXISTS post_shares (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_post_shares_post ON post_shares(post_id);
 
 CREATE TABLE IF NOT EXISTS member_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -591,6 +626,14 @@ function migrateColumns(handle) {
       )
       .run();
   }
+
+  // Post background color (Nov 2026, Facebook "Aa" palette): '' =
+  // no background; any other value must be a key from
+  // src/lib/post-colors.js (the API validates it on write).
+  const postCols = handle.prepare("PRAGMA table_info(posts)").all().map((c) => c.name);
+  if (!postCols.includes("bg_color")) {
+    handle.exec("ALTER TABLE posts ADD COLUMN bg_color TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 // --- Seed the admin-managed content (idempotent, guarded by counts) -----
@@ -732,7 +775,8 @@ export function getEnrollments(userId) {
     .prepare(
       `SELECT e.*, c.slug AS course_slug, c.title AS course_title,
               c.has_videos AS course_has_videos, c.unlocks AS course_unlocks,
-              c.billing AS course_billing, c.price_label AS course_price_label
+              c.billing AS course_billing, c.price_label AS course_price_label,
+              c.price_cents AS course_price_cents
        FROM enrollments e JOIN courses_services c ON c.id = e.course_id
        WHERE e.user_id = ? ORDER BY e.created_at ASC`
     )

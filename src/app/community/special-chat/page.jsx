@@ -6,13 +6,15 @@
 // up" / Suggested Posts. All three cards work exactly as before:
 // mentor-marked messages + Send, Open Chat → /chat, quick links to
 // Live Room / Consultations / Course Videos.
-// Gate: community members only (any enrollment) — everyone else sees
-// the same locked preview as the feed page. Gated: noindex.
+// Gate: community members only (PAID — Nov 2026, Siam's order: an
+// active paid enrollment, Forex $250 or unexpired Private Live Trade
+// $200/month) — everyone else sees the same locked preview as the
+// feed page. Gated: noindex.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getSessionUser } from "../../../lib/auth.js";
-import { canEnterCommunity } from "../../../lib/access.js";
-import LockedPreview from "../../../components/LockedPreview.jsx";
+import { getCommunityAccessState } from "../../../lib/access.js";
+import CommunityLockedPreview from "../../../components/CommunityLockedPreview.jsx";
 import IgRail from "../../../components/IgRail.jsx";
 import { SpecialChat } from "../../../components/CommunityClient.jsx";
 
@@ -25,20 +27,15 @@ export const metadata = {
 export default async function SpecialChatPage() {
   const user = await getSessionUser();
 
-  if (!user || !canEnterCommunity(user.id)) {
+  const communityAccess = getCommunityAccessState(user?.id);
+  if (!user || communityAccess.state !== "open") {
     return (
       <div className="wrap section">
         <p className="muted small">HOME › PREMIUM LIVE TRADE COMMUNITY › SPECIAL CHAT</p>
         <h1 style={{ fontSize: 36 }}>Special <span className="amber">Chat</span></h1>
-        <LockedPreview
-          title="🔒 Members-Only Community"
-          text="The Mentor Special Chat, member chat and quick links are only for members who have purchased a course or a service. Enroll in any program to unlock them."
-          unlocks="Unlocks with: any enrollment (any course or service)"
-          buttons={[
-            { href: "/enroll/forex-premium-course", label: "Enroll — Premium Course $250", style: "btn-amber" },
-            { href: "/enroll/private-live-trade", label: "Join Private Live Trade — $200", style: "btn-dark" },
-            { href: "/enroll/trading-consultation", label: "Consultation — Free", style: "btn-dark" },
-          ]}
+        <CommunityLockedPreview
+          access={communityAccess}
+          description="The Mentor Special Chat, member chat and quick links"
         />
       </div>
     );

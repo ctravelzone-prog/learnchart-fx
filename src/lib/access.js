@@ -7,7 +7,12 @@
 // GENERALIZED (Nov 2026): the gates are driven by COURSE FLAGS, not by
 // hard-coded slugs. A course added from the admin panel works the same
 // way with zero code changes:
-//   - Community: ANY enrollment unlocks it (any course or service).
+//   - Community: PAID-ONLY (Nov 2026, Siam's order — supersedes the
+//     original "any enrollment" rule): an ACTIVE enrollment whose
+//     course costs money (price_cents > 0) — Forex $250 one-time or
+//     Private Live Trade $200/month (unexpired). A FREE Trading
+//     Consultation enrollment alone does NOT open the Community,
+//     Special Chat or Member Chat; it opens only the Consultation area.
 //   - Live Room: any enrollment whose course has unlocks = 'live-room'.
 //   - Consultation: any enrollment whose course has unlocks =
 //     'consultation'.
@@ -36,13 +41,58 @@ export const SLUGS = {
 // renew instead of seeing a generic lock.
 const NOT_EXPIRED = "AND (e.expires_at IS NULL OR e.expires_at > datetime('now'))";
 
-// Community: ANY enrollment unlocks it (any one course or service).
+// Community: PAID-ONLY (Nov 2026, Siam's order). An ACTIVE enrollment
+// whose course costs money (price_cents > 0) — Forex $250 one-time or
+// an unexpired Private Live Trade $200/month subscription. A free
+// Trading Consultation enrollment alone does NOT open the Community:
+// the check joins the course and requires a price, so any future paid
+// course added from admin opens it too with zero code changes, while a
+// future free service never does. The same helper gates every
+// Community surface (feed, Special Chat, Create, Member Chat, member
+// profiles) and every community/chat API route — change it here and
+// all of them follow.
 export function canEnterCommunity(userId) {
   if (!userId) return false;
   const row = getDb()
-    .prepare(`SELECT id FROM enrollments e WHERE user_id = ? AND status = 'active' ${NOT_EXPIRED} LIMIT 1`)
+    .prepare(
+      `SELECT e.id FROM enrollments e
+       JOIN courses_services c ON c.id = e.course_id
+       WHERE e.user_id = ? AND e.status = 'active' AND c.price_cents > 0 ${NOT_EXPIRED} LIMIT 1`
+    )
     .get(userId);
   return !!row;
+}
+
+// Community access state, for the locked preview: 'open' (an active
+// paid enrollment), 'expired' (the student HAD a paid monthly
+// subscription — Private Live Trade — that ran out, so the preview
+// says so and offers Renew), or 'none' (never had a paid enrollment —
+// e.g. Consultation-only or no enrollment at all — the generic
+// paid-member lock). A cancelled enrollment is 'none', not 'expired':
+// only a lapsed paid subscription gets the Renew message.
+export function getCommunityAccessState(userId) {
+  if (!userId) return { state: "none" };
+  const open = getDb()
+    .prepare(
+      `SELECT e.id FROM enrollments e
+       JOIN courses_services c ON c.id = e.course_id
+       WHERE e.user_id = ? AND e.status = 'active' AND c.price_cents > 0 ${NOT_EXPIRED} LIMIT 1`
+    )
+    .get(userId);
+  if (open) return { state: "open" };
+  const expired = getDb()
+    .prepare(
+      `SELECT e.expires_at, c.slug AS course_slug, c.title AS course_title FROM enrollments e
+       JOIN courses_services c ON c.id = e.course_id
+       WHERE e.user_id = ? AND e.status = 'active' AND c.price_cents > 0
+         AND e.expires_at IS NOT NULL AND e.expires_at <= datetime('now')
+       ORDER BY e.expires_at DESC LIMIT 1`
+    )
+    .get(userId);
+  if (expired) {
+    return { state: "expired", expiredAt: expired.expires_at, courseSlug: expired.course_slug, courseTitle: expired.course_title };
+  }
+  return { state: "none" };
 }
 
 // Live Room: ANY enrollment whose course unlocks it (unlocks =

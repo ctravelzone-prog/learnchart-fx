@@ -16,9 +16,18 @@ import { getDb } from "../../../../lib/db.js";
 import { getSessionUser } from "../../../../lib/auth.js";
 import { canEnterCommunity } from "../../../../lib/access.js";
 import { parseDriveFileId } from "../../../../lib/drive.js";
+import { isBgColorKey } from "../../../../lib/post-colors.js";
 
 const ALLOWED_IMAGE = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_BYTES = 5 * 1024 * 1024;
+
+// Where the post returns to after publishing: only the two real
+// origins are allowed (the Community feed, or the profile page when
+// the post started from the profile composer) — anything else falls
+// back to /community. Never an open redirect.
+function safeReturnTo(value) {
+  return value === "/profile" ? "/profile" : "/community";
+}
 
 export async function POST(request) {
   const user = await getSessionUser();
@@ -29,13 +38,18 @@ export async function POST(request) {
   const text = String(form.get("text") || "").trim();
   const driveUrl = String(form.get("drive_url") || "").trim();
   const file = form.get("image");
+  const returnTo = safeReturnTo(String(form.get("return_to") || ""));
+  // Background color (Facebook "Aa" palette, from the Create Post
+  // modal): only a key from the palette is stored, and only for
+  // TEXT-ONLY posts — a photo or Drive video clears it.
+  const bgColorRaw = String(form.get("bg_color") || "").trim();
 
   // A post needs text, a picture, or a Drive video — not an empty post.
   if (!text && (!file || typeof file === "string" || file.size === 0) && !driveUrl) {
-    return redirectTo("/community?error=" + encodeURIComponent("Write something, add a picture, or paste a Drive video link."));
+    return redirectTo(`${returnTo}?error=` + encodeURIComponent("Write something, add a picture, or paste a Drive video link."));
   }
   if (text.length > 5000) {
-    return redirectTo("/community?error=" + encodeURIComponent("Post text is too long (max 5000 characters)."));
+    return redirectTo(`${returnTo}?error=` + encodeURIComponent("Post text is too long (max 5000 characters)."));
   }
 
   // Drive link: must be a real Google Drive link, or the post is refused.
@@ -43,7 +57,7 @@ export async function POST(request) {
   if (driveUrl) {
     driveFileId = parseDriveFileId(driveUrl);
     if (!driveFileId) {
-      return redirectTo("/community?error=" + encodeURIComponent("That is not a valid Google Drive video link. Paste a link to a video in your own Google Drive, and set its sharing to 'Anyone with the link can view'."));
+      return redirectTo(`${returnTo}?error=` + encodeURIComponent("That is not a valid Google Drive video link. Paste a link to a video in your own Google Drive, and set its sharing to 'Anyone with the link can view'."));
     }
   }
 
@@ -51,7 +65,7 @@ export async function POST(request) {
   let imagePath = null;
   if (file && typeof file !== "string" && file.size > 0) {
     if (!ALLOWED_IMAGE.has(file.type) || file.size > MAX_BYTES) {
-      return redirectTo("/community?error=" + encodeURIComponent("Pictures only (JPG, PNG, WebP, GIF up to 5 MB). Video upload is not allowed — paste a Google Drive link instead."));
+      return redirectTo(`${returnTo}?error=` + encodeURIComponent("Pictures only (JPG, PNG, WebP, GIF up to 5 MB). Video upload is not allowed — paste a Google Drive link instead."));
     }
     const buffer = Buffer.from(await file.arrayBuffer());
     const name = `${user.id}-${crypto.randomBytes(8).toString("hex")}.jpg`;
@@ -62,8 +76,12 @@ export async function POST(request) {
     imagePath = `/uploads/posts/${name}`;
   }
 
+  // Background color: only a palette key, and only when the post has
+  // no photo and no Drive video (text-only posts).
+  const bgColor = !imagePath && !driveFileId && isBgColorKey(bgColorRaw) ? bgColorRaw : "";
+
   getDb()
-    .prepare("INSERT INTO posts (user_id, text, image_path, drive_file_id, drive_url) VALUES (?, ?, ?, ?, ?)")
-    .run(user.id, text, imagePath, driveFileId, driveUrl || null);
-  return redirectTo("/community?posted=1");
+    .prepare("INSERT INTO posts (user_id, text, image_path, drive_file_id, drive_url, bg_color) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(user.id, text, imagePath, driveFileId, driveUrl || null, bgColor);
+  return redirectTo(`${returnTo}?posted=1`);
 }

@@ -6,7 +6,9 @@
 // (one per line), sort order, has_videos, unlocks, badge, card image.
 // has_videos = this course has video lessons + a unique Course Key per
 // student (emailed on enroll). unlocks = which area it opens, if any:
-// none / live-room / consultation. Community stays "any enrollment".
+// none / live-room / consultation. Community is PAID-ONLY (Nov 2026):
+// only a course with a price (price_cents > 0) opens it — the gate in
+// src/lib/access.js reads the price, so no flag is needed here.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { notFound } from "next/navigation";

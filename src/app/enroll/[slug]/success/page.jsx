@@ -33,7 +33,10 @@ export default async function EnrollSuccessPage({ params, searchParams }) {
     : null;
 
   const unlocked = [];
-  unlocked.push("Community — Premium Live Trade Everyday");
+  // Community is PAID-ONLY (Nov 2026): it unlocks only for a paid
+  // course (Forex $250 / Private Live Trade $200/month). A free
+  // Consultation enrollment opens only the Consultation area.
+  if (course.price_cents > 0) unlocked.push("Community — Premium Live Trade Everyday");
   if (course.unlocks === "live-room") unlocked.push("Live Room");
   if (course.unlocks === "consultation") unlocked.push("Trading Consultation area");
   if (course.has_videos) unlocked.push("Course Videos (after you enter your Course Key — emailed to your Gmail)");
@@ -84,7 +87,9 @@ export default async function EnrollSuccessPage({ params, searchParams }) {
         ) : null}
 
         <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-          <Link href="/community" className="btn btn-amber">Go to Community</Link>
+          {course.price_cents > 0 ? (
+            <Link href="/community" className="btn btn-amber">Go to Community</Link>
+          ) : null}
           {course.unlocks === "live-room" ? (
             <Link href="/live-room" className="btn btn-dark">Live Room</Link>
           ) : null}

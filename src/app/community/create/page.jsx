@@ -7,13 +7,15 @@
 // Drive video link) and Story (one or many photos, live for 24 hours
 // then deleted from the server). Posting a post redirects back to the
 // feed; posting stories does the same.
-// Gate: community members only (any enrollment) — everyone else sees
-// the same locked preview as the feed page. Gated: noindex.
+// Gate: community members only (PAID — Nov 2026, Siam's order: an
+// active paid enrollment, Forex $250 or unexpired Private Live Trade
+// $200/month) — everyone else sees the same locked preview as the
+// feed page. Gated: noindex.
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getSessionUser } from "../../../lib/auth.js";
-import { canEnterCommunity } from "../../../lib/access.js";
-import LockedPreview from "../../../components/LockedPreview.jsx";
+import { getCommunityAccessState } from "../../../lib/access.js";
+import CommunityLockedPreview from "../../../components/CommunityLockedPreview.jsx";
 import IgRail from "../../../components/IgRail.jsx";
 import { IgComposer, StoryPicker } from "../../../components/CommunityClient.jsx";
 
@@ -27,21 +29,22 @@ export default async function CommunityCreatePage({ searchParams }) {
   const sp = await searchParams;
   const user = await getSessionUser();
   const tab = sp?.tab === "story" ? "story" : "post";
+  // return_to ("/profile" only — anything else means /community): the
+  // profile composer sends the student back to /profile after posting.
+  // focus=drive (the composer's Reel button): focus the Drive video
+  // link field so a video post starts right there.
+  const returnTo = sp?.return_to === "/profile" ? "/profile" : "/community";
+  const focusDrive = sp?.focus === "drive";
 
-  if (!user || !canEnterCommunity(user.id)) {
+  const communityAccess = getCommunityAccessState(user?.id);
+  if (!user || communityAccess.state !== "open") {
     return (
       <div className="wrap section">
         <p className="muted small">HOME › PREMIUM LIVE TRADE COMMUNITY › CREATE</p>
         <h1 style={{ fontSize: 36 }}>Create <span className="amber">a post</span></h1>
-        <LockedPreview
-          title="🔒 Members-Only Community"
-          text="Creating posts and stories is only for members who have purchased a course or a service. Enroll in any program to unlock it."
-          unlocks="Unlocks with: any enrollment (any course or service)"
-          buttons={[
-            { href: "/enroll/forex-premium-course", label: "Enroll — Premium Course $250", style: "btn-amber" },
-            { href: "/enroll/private-live-trade", label: "Join Private Live Trade — $200", style: "btn-dark" },
-            { href: "/enroll/trading-consultation", label: "Consultation — Free", style: "btn-dark" },
-          ]}
+        <CommunityLockedPreview
+          access={communityAccess}
+          description="Creating posts and stories"
         />
       </div>
     );
@@ -67,7 +70,7 @@ export default async function CommunityCreatePage({ searchParams }) {
           </div>
 
           {tab === "post" ? (
-            <IgComposer me={me} />
+            <IgComposer me={me} returnTo={returnTo} focusDrive={focusDrive} />
           ) : (
             <div className="card ig-composer">
               <div className="ig-composer-head">
