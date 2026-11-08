@@ -81,7 +81,12 @@ h1, h2, h3, h4 { font-family: "Poppins", system-ui, sans-serif; line-height: 1.1
 .nav-links { display: flex; gap: 4px; margin: 0 auto; }
 .nav-links a { padding: 8px 14px; border-radius: 999px; font-weight: 600; font-size: 15px; color: var(--muted); }
 .nav-links a:hover { color: var(--ink); background: #262626; }
-.nav-links a.active { color: var(--ink); background: #262626; }
+/* Active page — design file's active-nav style: amber text + 2px underline,
+   6px offset (was a plain grey pill, identical to hover, so the current
+   page was impossible to tell apart). Same treatment for the My Profile
+   button in the nav-right. */
+.nav-links a.active { color: var(--amber); text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 2px; }
+.nav-right a.active { color: var(--amber); text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 2px; }
 .nav-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .burger { display: none; background: none; border: 1px solid var(--line2); border-radius: 10px; color: var(--ink); font-size: 20px; padding: 6px 10px; }
 
