@@ -56,18 +56,20 @@ export default function ChatRoom({ members, meId, peerId }) {
 
   return (
     <div className="chat-layout">
-      {/* Member list — one side. */}
+      {/* Member list — one side, Instagram Direct style. */}
       <div className="card">
-        <h3 style={{ marginBottom: 14 }}>👥 Members</h3>
+        <h3 style={{ marginBottom: 14 }}>Messages</h3>
         {members.length === 0 ? (
           <p className="muted small">No other members yet — member chat opens when another member joins.</p>
         ) : null}
         {members.map((m) => (
           <Link key={m.id} href={`/chat?with=${m.id}`} className={`chat-peer ${m.id === peerId ? "active" : ""}`}>
-            <span className="avatar">
-              {m.profile_pic ? <img src={m.profile_pic} alt={m.name} /> : m.name[0]}
+            <span className="ig-dm-peer">
+              <span className="avatar">
+                {m.profile_pic ? <img src={m.profile_pic} alt={m.name} /> : m.name[0]}
+              </span>
+              {m.name}
             </span>
-            {m.name}
           </Link>
         ))}
       </div>
@@ -81,7 +83,14 @@ export default function ChatRoom({ members, meId, peerId }) {
           </>
         ) : (
           <>
-            <h3 style={{ marginBottom: 4 }}>💬 {peer.name}</h3>
+            <h3 style={{ marginBottom: 4 }}>
+              <span className="ig-dm-peer">
+                <span className="avatar">
+                  {peer.profile_pic ? <img src={peer.profile_pic} alt={peer.name} /> : peer.name[0]}
+                </span>
+                {peer.name}
+              </span>
+            </h3>
             <p className="small muted" style={{ marginTop: 0 }}>
               One-to-one chat · <Link href={`/members/${peer.id}`} className="amber">View {peer.name}&apos;s profile →</Link>
             </p>

@@ -140,3 +140,72 @@ export function MemberChat({ members, meId }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// IgShareButton — Instagram-style share (paper plane). Copies a link to
+// the post to the clipboard; no DM is sent anywhere. Client-side only.
+// ---------------------------------------------------------------------------
+export function IgShareButton({ postId }) {
+  const [copied, setCopied] = useState(false);
+  async function share() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/community#post-${postId}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard blocked — nothing to do */ }
+  }
+  return copied ? (
+    <span className="ig-share-done">✓ Link copied</span>
+  ) : (
+    <button type="button" className="ig-icon-btn" onClick={share} aria-label="Share post">✈</button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// IgComposer — Instagram-style Create post. Photo FIRST (a big pick area
+// with a live preview), then caption, then the optional Drive video link.
+// Submits as a plain form POST to /api/community/posts — the server
+// enforces all post rules there (images only, 5 MB, no video upload,
+// Drive link must be valid). No separate login: the page gate already
+// made sure the member is logged in and enrolled.
+// ---------------------------------------------------------------------------
+export function IgComposer({ me }) {
+  const [preview, setPreview] = useState(null);
+  function onPick(e) {
+    const f = e.target.files && e.target.files[0];
+    if (f) setPreview(URL.createObjectURL(f));
+    else setPreview(null);
+  }
+  return (
+    <div className="card ig-composer">
+      <div className="ig-composer-head">
+        <span className="avatar">
+          {me.profile_pic ? <img src={me.profile_pic} alt={me.name} /> : me.name[0]}
+        </span>
+        <b>Create post</b>
+      </div>
+      <form action="/api/community/posts" method="post" encType="multipart/form-data">
+        <label className="ig-photo-pick" htmlFor="cp-image">
+          <b>📷 Add a photo</b>
+          Images only, up to 5 MB — tap to choose from your device
+          <input id="cp-image" name="image" type="file" accept="image/*" onChange={onPick} style={{ display: "none" }} />
+        </label>
+        {preview ? (
+          <div className="ig-photo-preview"><img src={preview} alt="Photo preview" /></div>
+        ) : null}
+        <div className="field">
+          <textarea name="text" rows={3} placeholder="Write a caption… share a lesson, ask for help, post your analysis" maxLength={5000} />
+        </div>
+        <div className="field">
+          <label htmlFor="cp-drive">Google Drive video link (optional)</label>
+          <input id="cp-drive" name="drive_url" type="url" placeholder="https://drive.google.com/file/d/…/view" />
+          <p className="small muted">
+            Videos: no direct upload — paste a Drive link instead and it plays inside your post, streamed from your
+            Drive. In Google Drive, set the video&apos;s sharing to “Anyone with the link can view”.
+          </p>
+        </div>
+        <button type="submit" className="btn btn-amber" style={{ width: "100%" }}>Post</button>
+      </form>
+    </div>
+  );
+}

@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
-// members/[id] — a member's profile page (Nov 2026: Community is
-// Facebook-like, so every member has a page of their own). Shows the
-// member's name, picture, member-since date, and THEIR posts/uploads
-// (newest first). Clicking any author's name or picture in the feed
+// members/[id] — a member's profile page, Instagram-style (Nov 2026).
+// Big avatar, name, REAL post count + member-since — never invented
+// followers/following counts (they don't exist). Below, a 3-column square
+// grid of their posts/pictures; tap a tile to open that post in the
+// Community feed. Clicking any author's name or picture in the feed
 // opens their page here. Members only: the viewer must be logged in
 // and enrolled (same gate as the Community); everyone else sees the
 // locked preview. Gated page: noindex.
@@ -13,7 +14,6 @@ import { getDb, getUserById } from "../../../lib/db.js";
 import { getSessionUser } from "../../../lib/auth.js";
 import { canEnterCommunity } from "../../../lib/access.js";
 import LockedPreview from "../../../components/LockedPreview.jsx";
-import PostCard from "../../../components/PostCard.jsx";
 
 export const metadata = {
   title: "Member Profile — LearnChart FX",
@@ -21,23 +21,12 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-// That member's posts, newest first, with like count + comments.
-// Plain objects only (see PostCard).
+// That member's posts, newest first. Plain objects only (server page).
 function getMemberPosts(memberId) {
   const db = getDb();
   return db
     .prepare("SELECT * FROM posts WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 50")
-    .all(memberId)
-    .map((p) => ({
-      ...p,
-      likes: db.prepare("SELECT COUNT(*) AS c FROM likes WHERE post_id = ?").get(p.id).c,
-      comments: db
-        .prepare(
-          `SELECT c.*, u.name AS author_name FROM comments c
-           JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC`
-        )
-        .all(p.id),
-    }));
+    .all(memberId);
 }
 
 export default async function MemberProfilePage({ params }) {
@@ -46,7 +35,9 @@ export default async function MemberProfilePage({ params }) {
   const memberId = Number(id);
   const user = await getSessionUser();
 
-  // Members only — same gate as the Community itself.
+  // Members only — same gate as the Community itself. No separate login
+  // inside the community: members are already logged in; the locked
+  // preview below is the only gate, for non-enrolled visitors.
   if (!user) redirect(`/login?next=/members/${id}`);
   if (!canEnterCommunity(user.id)) {
     return (
@@ -75,36 +66,47 @@ export default async function MemberProfilePage({ params }) {
     <div className="wrap section">
       <p className="muted small">COMMUNITY › MEMBER PROFILE</p>
 
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="post-head">
-          <span className="avatar" style={{ width: 72, height: 72, fontSize: 28 }}>
-            {member.profile_pic ? <img src={member.profile_pic} alt={member.name} /> : member.name[0]}
-          </span>
-          <div>
-            <h1 style={{ fontSize: 32 }}>{member.name}</h1>
-            <p className="muted small" style={{ margin: 0 }}>
-              Member since {new Date(member.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-              {" · "}{posts.length} post{posts.length === 1 ? "" : "s"}
-            </p>
+      {/* Instagram profile header: big avatar, name, real stats only. */}
+      <div className="ig-profile">
+        <span className="avatar">
+          {member.profile_pic ? <img src={member.profile_pic} alt={member.name} /> : member.name[0]}
+        </span>
+        <div>
+          <h1>{member.name}</h1>
+          <div className="ig-stats">
+            <span><b>{posts.length}</b> post{posts.length === 1 ? "" : "s"}</span>
+            <span>Member since {new Date(member.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
           </div>
-        </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
-          {isMe ? (
-            <Link href="/profile" className="btn btn-dark btn-sm">This is you — Edit My Profile →</Link>
-          ) : (
-            <Link href={`/chat?with=${member.id}`} className="btn btn-amber btn-sm">💬 Chat with {member.name} →</Link>
-          )}
-          <Link href="/community" className="btn btn-dark btn-sm">Back to Community →</Link>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {isMe ? (
+              <Link href="/profile" className="btn btn-dark btn-sm">Edit My Profile →</Link>
+            ) : (
+              <Link href={`/chat?with=${member.id}`} className="btn btn-amber btn-sm">💬 Chat with {member.name} →</Link>
+            )}
+            <Link href="/community" className="btn btn-dark btn-sm">Back to Community →</Link>
+          </div>
         </div>
       </div>
 
-      <h2>{isMe ? "My Posts / My Uploads" : `${member.name}'s Posts / Uploads`}</h2>
+      {/* Post grid — tap a tile to open that post in the feed. */}
+      <div className="ig-grid-head">▦ POSTS</div>
       {posts.length === 0 ? (
-        <div className="card"><p className="muted">{member.name} has not posted anything yet.</p></div>
-      ) : null}
-      {posts.map((p) => (
-        <PostCard key={p.id} post={p} authorName={member.name} authorPic={member.profile_pic} authorId={member.id} />
-      ))}
+        <div className="card center"><p className="muted">{member.name} has not posted anything yet.</p></div>
+      ) : (
+        <div className="ig-grid">
+          {posts.map((p) => (
+            <Link key={p.id} href={`/community#post-${p.id}`} className="ig-tile" aria-label={`Open post from ${new Date(p.created_at).toLocaleDateString("en-GB")}`}>
+              {p.image_path ? (
+                <img src={p.image_path} alt="Post picture" loading="lazy" />
+              ) : p.drive_file_id ? (
+                <span className="ig-tile-play">▶</span>
+              ) : (
+                <span className="ig-tile-text">{p.text}</span>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

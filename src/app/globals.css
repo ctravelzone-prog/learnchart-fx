@@ -413,6 +413,101 @@ h1, h2, h3, h4 { font-family: "Poppins", system-ui, sans-serif; line-height: 1.1
   .section { padding: 36px 0; }
 }
 
+/* --- Instagram-style Community (Nov 2026) ---
+   Siam's order: the Community must look and feel EXACTLY like
+   Instagram — single centered ~470px feed column, stories row on top,
+   post cards with icon action rows, Instagram-style profiles (real
+   post count only — no invented followers/following) and DM-style
+   chat. Dark theme + amber accent stay; brand stays LearnChart FX.
+   No separate login inside the community: members are already logged
+   in — the enrollment locked preview is the only gate, and it stays. */
+.ig-feed { max-width: 470px; margin: 0 auto; }
+.ig-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.ig-top h1 { font-size: 24px; }
+/* Stories row — circular avatars with an amber gradient ring, real
+   members with recent posts only. Tap opens the member's profile. */
+.ig-stories { display: flex; gap: 14px; overflow-x: auto; padding: 6px 2px 14px; scrollbar-width: none; }
+.ig-stories::-webkit-scrollbar { display: none; }
+.ig-story { flex-shrink: 0; width: 66px; text-align: center; }
+.ig-story-ring {
+  width: 64px; height: 64px; border-radius: 50%; margin: 0 auto; padding: 3px;
+  background: linear-gradient(45deg, var(--amber), var(--amber2), #ff6b35);
+}
+.ig-story-ring .avatar { width: 58px; height: 58px; border: 2px solid #0b0b0b; font-size: 20px; }
+.ig-story span { display: block; font-size: 11px; color: var(--muted); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Composer — photo first, like Instagram's Create. */
+.ig-composer { margin-bottom: 24px; }
+.ig-composer-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.ig-composer-head .avatar { width: 32px; height: 32px; font-size: 13px; }
+.ig-photo-pick {
+  display: block; border: 1px dashed var(--line2); border-radius: 12px;
+  padding: 18px 12px; text-align: center; cursor: pointer; color: var(--muted); margin-bottom: 12px;
+}
+.ig-photo-pick:hover { border-color: var(--amber); color: var(--ink); }
+.ig-photo-pick b { display: block; color: var(--ink); font-size: 15px; }
+.ig-photo-preview { border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+.ig-photo-preview img { width: 100%; max-height: 420px; object-fit: cover; }
+/* Post card — Instagram layout: header, full-bleed media, icon action
+   row, likes, caption, comments, add-a-comment. */
+.ig-post { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 24px; overflow: hidden; }
+.ig-post-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.ig-post-head .avatar { width: 32px; height: 32px; font-size: 13px; }
+.ig-post-head .who { flex: 1; min-width: 0; line-height: 1.25; }
+.ig-post-head .who b { font-size: 14px; }
+.ig-post-head .who span { display: block; font-size: 12px; color: var(--muted2); }
+.ig-dots { color: var(--muted); font-weight: 800; letter-spacing: 2px; }
+.ig-media img { width: 100%; display: block; }
+.ig-media .video-wrap { border-radius: 0; }
+.ig-text-media {
+  padding: 44px 26px; text-align: center;
+  background: linear-gradient(135deg, #2a2110, #1a1a1a 60%, #141414);
+}
+.ig-text-media p { font-family: "Poppins", sans-serif; font-size: 18px; line-height: 1.5; margin: 0; white-space: pre-wrap; }
+.ig-actions { display: flex; gap: 16px; align-items: center; padding: 10px 14px 0; }
+.ig-icon-btn { background: none; border: none; padding: 0; font-size: 24px; line-height: 1; color: var(--ink); cursor: pointer; }
+.ig-icon-btn:hover { color: var(--amber); }
+.ig-like-btn.liked { color: var(--red); }
+.ig-share-done { font-size: 13px; color: var(--green2); font-weight: 700; }
+.ig-likes { padding: 6px 14px 0; font-size: 14px; font-weight: 800; }
+.ig-caption { padding: 4px 14px 0; font-size: 14px; }
+.ig-caption b { margin-right: 6px; }
+.ig-comments { padding: 6px 14px 0; font-size: 14px; }
+.ig-comment { margin-top: 4px; }
+.ig-comment b { margin-right: 6px; }
+.ig-comment .muted { font-size: 12px; }
+.ig-add-comment {
+  display: flex; gap: 8px; align-items: center;
+  border-top: 1px solid var(--line); margin-top: 10px; padding: 10px 14px 12px;
+}
+.ig-add-comment input { border: none; background: transparent; padding: 4px 0; }
+.ig-add-comment input:focus { outline: none; }
+.ig-add-comment button { background: none; border: none; color: var(--amber); font-weight: 800; font-size: 14px; padding: 0; flex-shrink: 0; }
+/* Profile — Instagram header + 3-column square grid. Real data only:
+   post count + member-since. No followers/following (they don't exist). */
+.ig-profile { display: flex; gap: 28px; align-items: center; margin-bottom: 24px; }
+.ig-profile .avatar { width: 86px; height: 86px; font-size: 32px; }
+.ig-profile h1 { font-size: 28px; }
+.ig-stats { display: flex; gap: 18px; margin: 10px 0 14px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+.ig-stats b { color: var(--ink); }
+.ig-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.ig-tile { position: relative; aspect-ratio: 1 / 1; overflow: hidden; background: var(--panel); border-radius: 4px; display: block; }
+.ig-tile img { width: 100%; height: 100%; object-fit: cover; }
+.ig-tile-text { padding: 12px; font-size: 12.5px; color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; }
+.ig-tile-play {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 30px; color: #fff; background: rgba(0,0,0,0.25);
+}
+.ig-grid-head { display: flex; align-items: center; gap: 8px; justify-content: center; border-top: 1px solid var(--line); padding-top: 14px; margin: 8px 0 14px; color: var(--muted); font-weight: 700; font-size: 13px; letter-spacing: 0.08em; }
+/* DM-style chat (Instagram Direct look): list rows + bubbles. */
+.ig-dm-peer { display: flex; align-items: center; gap: 10px; }
+.ig-dm-peer .avatar { width: 40px; height: 40px; font-size: 15px; }
+
+@media (max-width: 560px) {
+  .ig-profile { gap: 18px; }
+  .ig-profile .avatar { width: 68px; height: 68px; font-size: 26px; }
+  .ig-profile h1 { font-size: 22px; }
+}
+
 /* --- Master admin panel (Nov 2026) --- */
 /* Admin nav bar: dark strip under the public pill nav, links wrap on
    small screens. Tables: simple dark rows, scroll sideways on phones. */
