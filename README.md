@@ -109,6 +109,56 @@ for local runs. **If SMTP is not configured, enrollment still completes**
 connected yet — your key will be emailed once the site owner connects
 email", and the key is never shown on the site.
 
+## Binance payments (enroll, automatic — Nov 2026)
+
+The paid course ($250) is paid on Binance — two rails, both automatic,
+both **free for the owner** (no merchant application, no paid service).
+`src/lib/payments.js` holds the logic; the enroll page renders the
+methods from a list (`src/app/enroll/[slug]/page.jsx` → `methods`), one
+component per method in `src/components/payments/`. **To add a third
+method (e.g. ZiniPay bKash/Nagad): write its component, append one entry
+to the methods list — nothing else changes.**
+
+- **Rail 1 — BEP20 USDT:** student sends exactly 250 USDT on BNB Smart
+  Chain to `BINANCE_BSC_ADDRESS`, pastes the TxHash; the server reads
+  the receipt (BscScan free-tier API when `BSCSCAN_API_KEY` is set,
+  otherwise the public BSC JSON-RPC) and checks Success + USDT transfer
+  to the merchant address + exact amount + TxHash never used before.
+- **Rail 2a — Binance Pay, PRIMARY:** student pays `BINANCE_PAY_ID`
+  and pastes the Order ID; the server checks the owner's Pay history
+  (`GET /sapi/v1/pay/transactions`) with a **READ-ONLY** Binance API key
+  (`BINANCE_API_KEY` + `BINANCE_API_SECRET` — Enable Reading only, never
+  trade/withdraw, IP-restricted) and matches Order ID + exact 250 USDT.
+  **Geo note:** Binance Spot API returns HTTP 451 from some regions
+  (notably US cloud IPs, including Render's default Oregon region). The
+  code tries all documented hosts (`api` + `api1`–`api4`) in turn; if
+  all are blocked, this rail fails with "try again in a minute" and
+  BEP20 stays the working rail. A non-US host, or the merchant API
+  (`bpay.binanceapi.com`), avoids the block.
+- **Rail 2b — Binance Pay merchant checkout, FUTURE-OPTIONAL:** only if
+  the owner is ever approved at merchant.binance.com — Create Order API
+  v3 + signature-verified webhook (`/api/payments/binance-pay-webhook`).
+  Never required; Rail 2a works without it.
+
+Every accepted payment is recorded in the `payments` table
+(`tx_hash` UNIQUE = the double-spend guard), then enrollment + unique
+Course Key + key email run exactly like a free enrollment. **If a rail
+is not configured, the enroll page says so honestly** ("not connected
+yet") instead of showing a fake address. No API key or secret ever
+reaches the browser, page source, or an API response. Env vars (all in
+`.env.example` with where each value comes from):
+
+```bash
+BINANCE_BSC_ADDRESS=0xYourBscWalletAddress
+BSCSCAN_API_KEY=YourFreeBscScanApiKey        # optional
+BINANCE_PAY_ID=YourBinancePayId
+BINANCE_API_KEY=YourReadOnlyBinanceApiKey    # Enable Reading only
+BINANCE_API_SECRET=YourReadOnlyBinanceApiSecret
+BINANCE_PAY_API_KEY=YourMerchantApiKey       # future-optional only
+BINANCE_PAY_SECRET_KEY=YourMerchantSecretKey # future-optional only
+SITE_URL=https://learnchart-fx.onrender.com  # optional
+```
+
 ## Community post rules (enforced in UI and server)
 
 - **Text:** yes. **Picture upload:** yes (images only, ≤ 5 MB, compressed).
@@ -125,9 +175,11 @@ email", and the key is never shown on the site.
 Stats numbers, testimonials, social handles/links, broker names/logos/links
 (4 cards), mentor photos/bios/tags, curriculum PDF, YouTube video IDs,
 lesson titles/durations (beyond "Starting Your Trading Journey" and
-"Mastering Trading Psychology"), payment method, streaming providers,
-contact email/phone. **Nothing is invented and nothing is copied from
-TradingChart.org** — every one of those is a marked `[Placeholder]`.
+"Mastering Trading Psychology"), streaming providers, contact email/phone.
+Payment is Binance automation now (see Binance payments above) — the
+merchant wallet / Pay ID / keys come from env vars, never invented.
+**Nothing is invented and nothing is copied from TradingChart.org** — every
+one of those is a marked `[Placeholder]`.
 
 ## Deployment (Render — GitHub + Render only)
 

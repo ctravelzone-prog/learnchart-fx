@@ -93,8 +93,13 @@ export const BROKERS = [
 // "Inside LearnChart FX" video — YouTube video ID is [Placeholder].
 export const INSIDE_VIDEO_ID = "[Placeholder]";
 
-// Payment method for the paid enrollment — [Placeholder, Siam to confirm].
-export const PAYMENT_METHOD = "[Placeholder — Siam to confirm payment method]";
+// Payment method for the paid enrollment — Binance automation (Nov 2026):
+// BEP20 USDT (verify on BNB Smart Chain) or Binance Pay (Order ID check
+// with a read-only API key; hosted merchant checkout is future-optional).
+// Free for the owner: no merchant application, no paid service. The
+// receiving wallet / Pay ID / keys come from environment variables only
+// (src/lib/payments.js) — nothing is hard-coded here.
+export const PAYMENT_METHOD = "Binance Pay or BEP20 USDT (verified automatically)";
 
 // Live Room streaming provider — [Placeholder, Siam to confirm].
 export const LIVE_STREAM_PROVIDER = "[Placeholder — Siam to confirm streaming provider]";

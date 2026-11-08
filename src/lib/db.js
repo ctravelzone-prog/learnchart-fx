@@ -206,6 +206,37 @@ CREATE TABLE IF NOT EXISTS password_resets (
   expires_at TEXT NOT NULL,
   used INTEGER NOT NULL DEFAULT 0
 );
+
+-- Verified Binance payments (Nov 2026 payment automation). One row per
+-- accepted payment. tx_hash is UNIQUE across ALL methods (a BEP20 TxHash
+-- or a Binance Pay Order ID) so the same transaction can never pay twice
+-- — this is the double-spend guard; the verification functions also
+-- check it before accepting anything.
+CREATE TABLE IF NOT EXISTS payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_slug TEXT NOT NULL,
+  method TEXT NOT NULL,
+  tx_hash TEXT NOT NULL UNIQUE,
+  amount TEXT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'USDT',
+  status TEXT NOT NULL DEFAULT 'verified',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Binance Pay merchant orders (created via the Create Order API v3).
+-- The webhook looks an order up by merchant_trade_no when Binance
+-- reports PAY_SUCCESS, so the enrollment can be completed then.
+CREATE TABLE IF NOT EXISTS binance_pay_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  merchant_trade_no TEXT NOT NULL UNIQUE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_slug TEXT NOT NULL,
+  amount TEXT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'USDT',
+  status TEXT NOT NULL DEFAULT 'created',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `; 
 
 // --- Seed: the three offers from prompt Section 10 ------------------------

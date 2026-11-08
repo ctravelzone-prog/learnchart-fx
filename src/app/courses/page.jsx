@@ -89,8 +89,8 @@ export default async function CoursesPage() {
       <div className="card" style={{ marginTop: 28 }}>
         <h3>Payment</h3>
         <p className="muted">
-          Payment method: <strong>{PAYMENT_METHOD}</strong> — enrollment for the paid
-          course records your place; the payment step will be connected here before launch.
+          Payment method: <strong>{PAYMENT_METHOD}</strong> — pay exactly 250 USDT on Binance and the site
+          verifies your payment automatically. No manual check, no waiting for the owner.
         </p>
         <p className="small muted">
           The Forex Trading Premium Course is $250 · 10 sessions / 10 lessons.
