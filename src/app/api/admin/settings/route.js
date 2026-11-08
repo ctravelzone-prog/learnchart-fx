@@ -55,7 +55,7 @@ export async function POST(request) {
 
   // Single values (empty = keep the previous value, except the
   // inside-video ID which may be cleared back to the placeholder).
-  const singles = ["live_stream_provider", "consult_provider", "contact_email", "contact_phone", "contact_address", "next_batch_date", "site_mission"];
+  const singles = ["consult_provider", "contact_email", "contact_phone", "contact_address", "next_batch_date", "site_mission"];
   for (const key of singles) {
     const value = String(form.get(key) || "").trim();
     if (value) setSetting(key, value);

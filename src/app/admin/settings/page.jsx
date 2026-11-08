@@ -63,10 +63,6 @@ export default async function AdminSettingsPage({ searchParams }) {
               <input id="next_batch_date" name="next_batch_date" defaultValue={getSingleSetting("next_batch_date", "")} placeholder="2027-01-10T00:00:00+06:00" />
             </div>
             <div className="field">
-              <label htmlFor="live_stream_provider">Live stream provider</label>
-              <input id="live_stream_provider" name="live_stream_provider" defaultValue={getSingleSetting("live_stream_provider", "")} />
-            </div>
-            <div className="field">
               <label htmlFor="consult_provider">Consultation audio/video provider</label>
               <input id="consult_provider" name="consult_provider" defaultValue={getSingleSetting("consult_provider", "")} />
             </div>

@@ -176,6 +176,77 @@ export function getPublicPaymentConfig() {
   };
 }
 
+// --- Live Room (dual-source streaming, Nov 2026) ----------------------
+// The Live Room shows ONE live source at a time, picked by the admin in
+// Admin → Live Settings:
+//   source "off"     = no live right now (schedule + offline note)
+//   source "own"     = own private server (Owncast: OBS → RTMP ingest
+//                      → HLS out). Truly private — nothing on YouTube.
+//   source "youtube" = YouTube Live Unlisted embed. Hidden from search /
+//                      channel / recommendations, but NOT locked —
+//                      anyone with the link can watch.
+// The stream KEY is a secret (enc: prefix, admin-only, never sent to
+// the browser). The Owncast URL and YouTube ID are public-by-design
+// (they appear in the player) but are only ever rendered for
+// Private-Live-Trade members — the /live-room gate decides that.
+
+// Parse a YouTube live video ID from a full URL or a bare ID.
+// Accepts watch?v=, youtu.be/, /live/, /embed/, /shorts/ and bare IDs.
+// Returns the 11-char ID or "" when the input is not recognisable.
+export function parseYouTubeLiveId(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  // Bare 11-char ID.
+  if (/^[\w-]{11}$/.test(raw)) return raw;
+  // Full URL — try the usual shapes.
+  let url = null;
+  try {
+    url = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+  } catch {
+    return "";
+  }
+  const host = url.hostname.replace(/^www\./, "");
+  if (host === "youtu.be") {
+    const id = url.pathname.split("/").filter(Boolean)[0] || "";
+    return /^[\w-]{11}$/.test(id) ? id : "";
+  }
+  if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+    const v = url.searchParams.get("v") || "";
+    if (/^[\w-]{11}$/.test(v)) return v;
+    const parts = url.pathname.split("/").filter(Boolean);
+    if ((parts[0] === "live" || parts[0] === "embed" || parts[0] === "shorts") && /^[\w-]{11}$/.test(parts[1] || "")) {
+      return parts[1];
+    }
+  }
+  return "";
+}
+
+// Owncast server base URL, e.g. https://live.learnchartfx.com.
+// Trailing slash stripped; must be http(s) or it is treated as unset.
+export function normalizeOwncastUrl(input) {
+  const raw = String(input || "").trim().replace(/\/+$/, "");
+  if (!/^https?:\/\/.+/.test(raw)) return "";
+  return raw;
+}
+
+// Public-safe live settings (NO stream key — see getOwncastStreamKey).
+// DB first, OWNCAST_URL env as fallback for the server URL (env vars
+// survive a DB wipe; the source + YouTube ID are admin-panel only).
+export function getLiveSettings() {
+  const source = String(getSetting("live_source") || "off").trim();
+  return {
+    source: ["off", "own", "youtube"].includes(source) ? source : "off",
+    youtubeLiveId: String(getSetting("live_youtube_id") || "").trim(),
+    owncastUrl: normalizeOwncastUrl(getSetting("live_owncast_url")) || normalizeOwncastUrl(process.env.OWNCAST_URL),
+  };
+}
+
+// The Owncast stream key — server-side ONLY. Never pass it to a page
+// or component; it only goes to the admin settings UI masked (last 4).
+export function getOwncastStreamKey() {
+  return getSecretSetting("live_owncast_key");
+}
+
 // --- SMTP / email settings (DB first, env fallback) -----------------------
 // Same rule as payments: fill them in the admin panel and email works;
 // leave them empty and the env vars are used instead.

@@ -1,0 +1,24 @@
+# owncast.service — run Owncast (LearnChart FX live server) on boot.
+# Copy to /etc/systemd/system/owncast.service, then:
+#   systemctl daemon-reload && systemctl enable --now owncast
+# Owncast listens on http://127.0.0.1:8080 (web + admin) and
+# 0.0.0.0:1935 (RTMP ingest). Data lives in /opt/owncast/data.
+[Unit]
+Description=Owncast — LearnChart FX private live server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=owncast
+Group=owncast
+WorkingDirectory=/opt/owncast
+ExecStart=/opt/owncast/owncast
+Restart=always
+RestartSec=5
+# Owncast + ffmpeg transcoding: give it room, but cap it so a bad
+# stream cannot eat the whole box.
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

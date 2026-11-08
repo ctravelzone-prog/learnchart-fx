@@ -1,0 +1,9 @@
+# Caddyfile — HTTPS for the Owncast live server (LearnChart FX).
+# Copy to /etc/caddy/Caddyfile (edit the domain first), then:
+#   systemctl reload caddy
+# Caddy fetches a free Let's Encrypt certificate automatically.
+# Replace live.example.com with your real subdomain everywhere.
+
+live.example.com {
+	reverse_proxy 127.0.0.1:8080
+}

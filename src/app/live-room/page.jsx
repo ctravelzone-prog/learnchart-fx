@@ -2,14 +2,24 @@
 // live-room/page.jsx — Live Room (prompt Section 18). Gate (server-side):
 // Private Live Trade enrollment ONLY. Forex course alone does NOT
 // open it; Consultation alone does NOT open it. The locked preview says
-// exactly that. Streaming provider is [Placeholder — Siam to confirm].
+// exactly that. An ADMIN session may also view the room (moderation
+// preview — admins see the chat and can delete messages).
+//
+// DUAL-SOURCE LIVE (Nov 2026): the admin picks ONE live source in
+// Admin → Live Settings — the own private server (Owncast HLS, truly
+// private, 100+ students) or YouTube Live Unlisted (hidden, not locked).
+// The player below is rendered ONLY for members who passed the gate,
+// so a locked-out visitor never receives a video ID, stream URL or key.
+// The live chat panel is private the same way (PLT members only).
 // ---------------------------------------------------------------------------
 import Link from "next/link";
 import { getSessionUser } from "../../lib/auth.js";
+import { getAdminUser } from "../../lib/admin.js";
 import { getLiveRoomAccessState } from "../../lib/access.js";
-import { LIVE_STREAM_PROVIDER } from "../../lib/config.js";
-import { getSingleSetting } from "../../lib/settings.js";
+import { getLiveSettings } from "../../lib/settings.js";
 import LockedPreview from "../../components/LockedPreview.jsx";
+import HlsPlayer from "../../components/HlsPlayer.jsx";
+import LiveChat from "../../components/LiveChat.jsx";
 
 export const metadata = {
   title: "Live Room — LearnChart FX",
@@ -20,8 +30,13 @@ export const metadata = {
 export default async function LiveRoomPage() {
   const user = await getSessionUser();
   const access = getLiveRoomAccessState(user?.id);
+  // Admin preview: an admin session may view the room (and moderate the
+  // live chat) without a PLT enrollment. The gate itself is untouched —
+  // this is a page-level preview, not a new way in for members.
+  const admin = await getAdminUser();
+  const isAdminView = !!admin && access.state !== "open";
 
-  if (access.state === "expired") {
+  if (access.state === "expired" && !isAdminView) {
     // MONTHLY SUBSCRIPTION LAPSED (Nov 2026): the student HAD Private
     // Live Trade, but the 30 days ran out. Say so with the exact date
     // and offer Renew — not the generic "you never enrolled" lock.
@@ -45,7 +60,7 @@ export default async function LiveRoomPage() {
     );
   }
 
-  if (access.state !== "open") {
+  if (access.state !== "open" && !isAdminView) {
     return (
       <div className="wrap section">
         <p className="muted small">HOME › LIVE ROOM</p>
@@ -63,6 +78,13 @@ export default async function LiveRoomPage() {
     );
   }
 
+  // Dual-source live (Nov 2026): the admin picks ONE source in
+  // Admin → Live Settings. Only the chosen source's player is rendered,
+  // and only for members who passed the gate above.
+  const live = getLiveSettings();
+  const hlsUrl = live.source === "own" && live.owncastUrl ? `${live.owncastUrl}/hls/stream.m3u8` : "";
+  const youtubeId = live.source === "youtube" ? live.youtubeLiveId : "";
+
   return (
     <div className="wrap section">
       <p className="muted small">HOME › LIVE ROOM</p>
@@ -71,6 +93,9 @@ export default async function LiveRoomPage() {
         Watch Siam Chowdhury and Rex Mizan analyse and trade the live market — entries, stop loss and targets explained as they happen.
       </p>
       <p><span className="badge badge-green">🔓 Live Room unlocked</span> <span className="muted small">Your Private Live Trade enrollment gives you full access to every live session below.</span></p>
+      {isAdminView ? (
+        <p className="small muted">👁️ Viewing as admin — members see this same room.</p>
+      ) : null}
       {access.expiresAt ? (
         <p className="small muted">
           Monthly subscription — your access runs until{" "}
@@ -80,23 +105,57 @@ export default async function LiveRoomPage() {
       ) : null}
 
       <div className="card">
-        <div className="stage-img">
-          <img src="/images/mentor-studio.webp" alt="Mentor broadcasting live from the trading studio with a large candlestick chart behind him" />
-          <span className="badge badge-amber stage-badge">NEXT LIVE</span>
-          <div className="stage-foot">
-            <div>
-              <b>Private Live Trade — Daily Sessions</b>
-              <div className="small muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</div>
+        {hlsUrl ? (
+          <>
+            <HlsPlayer src={hlsUrl} />
+            <h2 style={{ marginTop: 16 }}>Private Live Trade — Daily Sessions</h2>
+            <p className="muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</p>
+            <p className="small muted">Private live server — only members of this site can watch. HLS delay is roughly 10–30 seconds.</p>
+          </>
+        ) : youtubeId ? (
+          <>
+            <div className="live-player">
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=0&rel=0`}
+                title="Live Room — YouTube Live"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
+              />
+              <span className="badge badge-red live-badge">🔴 LIVE NOW</span>
             </div>
-          </div>
-        </div>
-        <h2 style={{ marginTop: 16 }}>Private Live Trade — Daily Sessions</h2>
-        <p className="muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</p>
-        <div className="alert alert-info">
-          Live stream provider: <strong>{getSingleSetting("live_stream_provider", LIVE_STREAM_PROVIDER)}</strong> — the live player will appear here once Siam confirms the streaming provider.
-        </div>
+            <h2 style={{ marginTop: 16 }}>Private Live Trade — Daily Sessions</h2>
+            <p className="muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</p>
+            <p className="small muted">YouTube Live (Unlisted) — hidden from search and the channel, shown here for members only.</p>
+          </>
+        ) : (
+          <>
+            <div className="stage-img">
+              <img src="/images/mentor-studio.webp" alt="Mentor broadcasting live from the trading studio with a large candlestick chart behind him" />
+              <span className="badge badge-amber stage-badge">NEXT LIVE</span>
+              <div className="stage-foot">
+                <div>
+                  <b>Private Live Trade — Daily Sessions</b>
+                  <div className="small muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</div>
+                </div>
+              </div>
+            </div>
+            <h2 style={{ marginTop: 16 }}>Private Live Trade — Daily Sessions</h2>
+            <p className="muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</p>
+            <div className="alert alert-info">
+              No live right now — the mentors are offline. Check the schedule below for the next session.
+            </div>
+          </>
+        )}
         <p>✅ You are in the live room. Ask your questions in the Mentor Special Chat and use @Mentor so they get picked up live.</p>
         <Link href="/community/special-chat" className="btn btn-amber">Open Mentor Special Chat →</Link>
+      </div>
+
+      {/* Live classroom chat — private, PLT members only, during the live. */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3>💬 Live Chat</h3>
+        <p className="muted small">Chat with the mentors and other members while the live is on. Private — only Private Live Trade members can see this chat.</p>
+        <LiveChat userName={user?.name || "Admin"} userId={user?.id || 0} isAdmin={!!admin} canSend={!!user} />
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

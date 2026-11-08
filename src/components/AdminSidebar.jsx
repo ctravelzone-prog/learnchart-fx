@@ -56,7 +56,10 @@ const GROUPS = [
   },
   {
     label: "Settings",
-    links: [["/admin/settings", "Site Settings"]],
+    links: [
+      ["/admin/settings", "Site Settings"],
+      ["/admin/live-settings", "Live Settings"],
+    ],
   },
 ];
 
