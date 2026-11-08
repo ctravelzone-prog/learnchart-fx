@@ -29,14 +29,14 @@ import InsideVideoCover from "../components/InsideVideoCover.jsx";
 // broadcast, consultation card = one-on-one video call.)
 const COURSE_IMAGES = {
   "forex-premium-course": { src: "/images/mentor-desk.webp", alt: "Forex Trading Premium Course with mentor Siam Chowdhury" },
-  "premium-live-trade-support": { src: "/images/mentor-studio.webp", alt: "Premium Live Trade Support — mentor live in the trading studio" },
+  "private-live-trade": { src: "/images/mentor-studio.webp", alt: "Private Live Trade — mentor live in the trading studio" },
   "trading-consultation": { src: "/images/consultation-call.webp", alt: "Trading Consultation — one-on-one session with the mentor" },
 };
 
 export const metadata = {
   title: "LearnChart FX — Mastering Trading With Experts",
   description:
-    "LearnChart FX — forex trading premium course, premium live trade support every day and trading consultation. Mentors Siam Chowdhury and Rex Mizan.",
+    "LearnChart FX — forex trading premium course, private live trade every day and trading consultation. Mentors Siam Chowdhury and Rex Mizan.",
 };
 
 function SectionTitle({ children, sub }) {

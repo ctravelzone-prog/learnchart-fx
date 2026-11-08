@@ -9,11 +9,11 @@ import Footer from "../components/Footer.jsx";
 export const metadata = {
   title: "LearnChart FX — Mastering Trading With Experts",
   description:
-    "LearnChart FX — forex trading premium course, premium live trade support every day and trading consultation. Mentors Siam Chowdhury and Rex Mizan.",
+    "LearnChart FX — forex trading premium course, private live trade every day and trading consultation. Mentors Siam Chowdhury and Rex Mizan.",
   openGraph: {
     title: "LearnChart FX — Mastering Trading With Experts",
     description:
-      "Forex trading premium course, premium live trade support every day and trading consultation. Mentors Siam Chowdhury and Rex Mizan.",
+      "Forex trading premium course, private live trade every day and trading consultation. Mentors Siam Chowdhury and Rex Mizan.",
     type: "website",
   },
 };

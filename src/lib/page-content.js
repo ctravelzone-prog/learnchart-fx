@@ -97,7 +97,7 @@ export const PAGE_DEFAULTS = {
     main: {
       heading_start: { label: "Heading — before the highlight", type: "text", value: "Contact" },
       heading_highlight: { label: "Heading — highlighted word", type: "text", value: "Us" },
-      intro: { label: "Intro paragraph", type: "textarea", value: "Questions about the course, live trade support or consultation? Reach the LearnChart FX team on any channel below — mentors Siam Chowdhury and Rex Mizan reply inside the member community." },
+      intro: { label: "Intro paragraph", type: "textarea", value: "Questions about the course, private live trade or consultation? Reach the LearnChart FX team on any channel below — mentors Siam Chowdhury and Rex Mizan reply inside the member community." },
     },
     channels: {
       telegram_title: { label: "Telegram card title", type: "text", value: "✈️ Telegram" },

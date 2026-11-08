@@ -65,7 +65,7 @@ For development: `npm run dev`.
 | `/community` | Members-only feed, composer, Mentor Special Chat (member chat moved to `/chat`) |
 | `/chat` | Member chat — member list + one-to-one conversation, its own page |
 | `/members/[id]` | A member's profile page — their name, picture, posts/uploads |
-| `/live-room` | Live Room — any enrollment whose course unlocks it (Premium Live Trade Support) |
+| `/live-room` | Live Room — any enrollment whose course unlocks it (Private Live Trade, $200) |
 | `/consultation` | Trading Consultation — any enrollment whose course unlocks it (Consultation), Coming Soon |
 | `/admin` | **Master admin panel** — dashboard, users, courses, enrollments, payments, lessons, community, FAQ, contact inbox, mentors, pages/content, site settings, payment + email settings, status, change password |
 
@@ -96,7 +96,7 @@ For development: `npm run dev`.
 |---|---|
 | Mentors | Everyone |
 | Community | Any enrollment |
-| Live Room | Premium Live Trade Support enrollment ONLY |
+| Live Room | Private Live Trade enrollment ONLY |
 | Consultation | Trading Consultation enrollment ONLY |
 | Course Videos | Forex course enrollment + valid Course Key, asked on EVERY visit |
 | Member Chat (`/chat`) | Any enrollment (same as Community) |

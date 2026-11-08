@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // live-room/page.jsx — Live Room (prompt Section 18). Gate (server-side):
-// Premium Live Trade Support enrollment ONLY. Forex course alone does NOT
+// Private Live Trade enrollment ONLY. Forex course alone does NOT
 // open it; Consultation alone does NOT open it. The locked preview says
 // exactly that. Streaming provider is [Placeholder — Siam to confirm].
 // ---------------------------------------------------------------------------
@@ -26,11 +26,11 @@ export default async function LiveRoomPage() {
         <p className="muted small">HOME › LIVE ROOM</p>
         <h1 style={{ fontSize: 36 }}>Live <span className="amber">Room</span></h1>
         <LockedPreview
-          title="🔒 Live Room — Premium Live Trade Support Only"
-          text="The Live Room is part of Premium Live Trade Support. You can only join it after you purchase / enroll in Premium Live Trade Support."
+          title="🔒 Live Room — Private Live Trade Only"
+          text="The Live Room is part of Private Live Trade. You can only join it after you purchase / enroll in Private Live Trade."
           unlocks="⚠️ Buying only the Forex Trading Premium Course does not unlock the Live Room."
           buttons={[
-            { href: "/enroll/premium-live-trade-support", label: "Enroll in Premium Live Trade Support — Free", style: "btn-amber" },
+            { href: "/enroll/private-live-trade", label: "Enroll in Private Live Trade — $200", style: "btn-amber" },
             { href: "/courses", label: "See All Programs", style: "btn-dark" },
           ]}
         />
@@ -45,7 +45,7 @@ export default async function LiveRoomPage() {
       <p className="muted">
         Watch Siam Chowdhury and Rex Mizan analyse and trade the live market — entries, stop loss and targets explained as they happen.
       </p>
-      <p><span className="badge badge-green">🔓 Live Room unlocked</span> <span className="muted small">Your Premium Live Trade Support enrollment gives you full access to every live session below.</span></p>
+      <p><span className="badge badge-green">🔓 Live Room unlocked</span> <span className="muted small">Your Private Live Trade enrollment gives you full access to every live session below.</span></p>
 
       <div className="card">
         <div className="stage-img">
@@ -53,12 +53,12 @@ export default async function LiveRoomPage() {
           <span className="badge badge-amber stage-badge">NEXT LIVE</span>
           <div className="stage-foot">
             <div>
-              <b>Premium Live Trade — Daily Sessions</b>
+              <b>Private Live Trade — Daily Sessions</b>
               <div className="small muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</div>
             </div>
           </div>
         </div>
-        <h2 style={{ marginTop: 16 }}>Premium Live Trade — Daily Sessions</h2>
+        <h2 style={{ marginTop: 16 }}>Private Live Trade — Daily Sessions</h2>
         <p className="muted">Siam Chowdhury &amp; Rex Mizan · live market analysis</p>
         <div className="alert alert-info">
           Live stream provider: <strong>{getSingleSetting("live_stream_provider", LIVE_STREAM_PROVIDER)}</strong> — the live player will appear here once Siam confirms the streaming provider.
@@ -71,7 +71,7 @@ export default async function LiveRoomPage() {
         <h3>📅 Regular live schedule (Dhaka time)</h3>
         <ul className="check-list">
           <li><strong>MON – FRI · London session live</strong> — daily bias &amp; gold plan · 3:30 PM – 5:30 PM · market open analysis</li>
-          <li><strong>MON – FRI · New York session live</strong> — premium live trade · 7:30 PM – 10:30 PM · live entries, management and Q&amp;A</li>
+          <li><strong>MON – FRI · New York session live</strong> — private live trade · 7:30 PM – 10:30 PM · live entries, management and Q&amp;A</li>
           <li><strong>SUNDAY · Weekly planning session</strong> — 9:00 PM · week-ahead levels and member chart reviews</li>
         </ul>
       </div>

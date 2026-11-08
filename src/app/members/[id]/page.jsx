@@ -60,7 +60,7 @@ export default async function MemberProfilePage({ params }) {
           unlocks="Unlocks with: any enrollment (any course or service)"
           buttons={[
             { href: "/enroll/forex-premium-course", label: "Enroll — Premium Course $250", style: "btn-amber" },
-            { href: "/enroll/premium-live-trade-support", label: "Join Live Trade — Free", style: "btn-dark" },
+            { href: "/enroll/private-live-trade", label: "Join Private Live Trade — $200", style: "btn-dark" },
           ]}
         />
       </div>

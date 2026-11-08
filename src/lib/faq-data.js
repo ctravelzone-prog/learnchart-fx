@@ -24,7 +24,7 @@ export const FAQ_ENROLLMENT = [
   },
   {
     q: "Do you provide live market analysis and trading guidance?",
-    a: "Yes — through Premium Live Trade Support. Members get daily trade setups, real-time forex and gold market analysis with clear entry, stop-loss and take-profit levels, and live sessions with the mentors Monday to Friday.",
+    a: "Yes — through Private Live Trade. Members get daily trade setups, real-time forex and gold market analysis with clear entry, stop-loss and take-profit levels, and live sessions with the mentors Monday to Friday.",
   },
   {
     q: "Does LearnChart FX cover forex, metals, and indices?",

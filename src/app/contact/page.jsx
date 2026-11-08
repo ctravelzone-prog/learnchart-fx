@@ -11,7 +11,7 @@ import { getPageContent } from "../../lib/page-content.js";
 
 export const metadata = {
   title: "Contact Us — LearnChart FX",
-  description: "Questions about the course, live trade support or consultation? Reach the LearnChart FX team.",
+  description: "Questions about the course, private live trade or consultation? Reach the LearnChart FX team.",
 };
 
 export default async function ContactPage({ searchParams }) {

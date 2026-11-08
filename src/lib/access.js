@@ -23,7 +23,7 @@ import { generateVisitToken, hashVisitToken } from "./keys.js";
 
 export const SLUGS = {
   FOREX: "forex-premium-course",
-  LIVE: "premium-live-trade-support",
+  LIVE: "private-live-trade",
   CONSULT: "trading-consultation",
 };
 
@@ -37,8 +37,8 @@ export function canEnterCommunity(userId) {
 }
 
 // Live Room: ANY enrollment whose course unlocks it (unlocks =
-// 'live-room'). The original Live Trade Support course carries this
-// flag; any course added from admin with the same flag opens it too.
+// 'live-room'). The Private Live Trade course carries this flag; any
+// course added from admin with the same flag opens it too.
 export function canEnterLiveRoom(userId) {
   if (!userId) return false;
   const row = getDb()

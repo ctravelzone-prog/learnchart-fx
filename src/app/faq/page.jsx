@@ -9,7 +9,7 @@ import { getFaqsList } from "../../lib/settings.js";
 
 export const metadata = {
   title: "Frequently Asked Questions — LearnChart FX",
-  description: "Answers about the LearnChart FX premium course, live trade support and consultation.",
+  description: "Answers about the LearnChart FX premium course, private live trade and consultation.",
 };
 
 export default function FaqPage() {

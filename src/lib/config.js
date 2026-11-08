@@ -69,7 +69,7 @@ export const TESTIMONIALS = [
   { name: "[Student Name]", program: "Forex Trading Premium Course", text: "[Placeholder testimonial — a real student review will be added here.]" },
   { name: "[Student Name]", program: "Forex Trading Premium Course", text: "[Placeholder testimonial — a real student review will be added here.]" },
   { name: "[Student Name]", program: "Student Of LearnChart FX", text: "[Placeholder testimonial — a real student review will be added here.]" },
-  { name: "[Student Name]", program: "Premium Live Trade Support", text: "[Placeholder testimonial — a real student review will be added here.]" },
+  { name: "[Student Name]", program: "Private Live Trade", text: "[Placeholder testimonial — a real student review will be added here.]" },
 ];
 
 // Social cards — handles and links are [Placeholder].

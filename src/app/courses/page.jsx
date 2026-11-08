@@ -9,12 +9,11 @@ import Link from "next/link";
 import { getAllCourses, getEnrollments, getLessons } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import { PAYMENT_METHOD } from "../../lib/config.js";
-import { getUsdtAmount } from "../../lib/settings.js";
 
 export const metadata = {
   title: "Courses & Services — LearnChart FX",
   description:
-    "Forex Trading Premium Course ($250), Premium Live Trade Support (Free) and Trading Consultation (Free) — LearnChart FX.",
+    "Forex Trading Premium Course ($250), Private Live Trade ($200) and Trading Consultation (Free) — LearnChart FX.",
 };
 
 function EnrollButton({ course, enrolled }) {
@@ -41,7 +40,6 @@ export default async function CoursesPage() {
   for (const c of courses) {
     if (c.has_videos) lessonCounts[c.slug] = getLessons(c.id).length;
   }
-  const usdtAmount = getUsdtAmount(250);
 
   return (
     <div className="wrap section">
@@ -90,7 +88,7 @@ export default async function CoursesPage() {
       <div className="card" style={{ marginTop: 28 }}>
         <h3>Payment</h3>
         <p className="muted">
-          Payment method: <strong>{PAYMENT_METHOD}</strong> — pay exactly {usdtAmount} USDT on Binance and the site
+          Payment method: <strong>{PAYMENT_METHOD}</strong> — pay exactly the course price in USDT on Binance and the site
           verifies your payment automatically. No manual check, no waiting for the owner.
         </p>
         <p className="small muted">

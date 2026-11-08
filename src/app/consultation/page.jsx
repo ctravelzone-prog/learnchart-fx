@@ -33,7 +33,7 @@ export default async function ConsultationPage({ searchParams }) {
         <LockedPreview
           title="🔒 Consultation — Trading Consultation Members Only"
           text="This section is visible only to members who purchased / enrolled in Trading Consultation."
-          unlocks="⚠️ Buying only the Forex Premium Course or only Premium Live Trade Support does not unlock Consultation."
+          unlocks="⚠️ Buying only the Forex Premium Course or only Private Live Trade does not unlock Consultation."
           buttons={[
             { href: "/enroll/trading-consultation", label: "Enroll in Trading Consultation — Free", style: "btn-amber" },
             { href: "/courses", label: "See All Programs", style: "btn-dark" },

@@ -390,15 +390,15 @@ function seed(handle) {
   ).lastInsertRowid;
 
   insertCourse.run(
-    "premium-live-trade-support",
-    "Premium Live Trade Support",
-    "Live Market Analysis & Trade Guidance",
+    "private-live-trade",
+    "Private Live Trade",
+    "Private Live Market Analysis & Trade Guidance",
     "Advanced",
     "Ongoing",
-    "Free",
-    0,
-    "join_telegram",
-    "Join Telegram",
+    "$200",
+    20000,
+    "enroll",
+    "Enroll Now",
     JSON.stringify([
       "Telegram-Based Live Trade Updates",
       "Real-Time Forex and Gold Market Analysis",
@@ -528,13 +528,13 @@ function migrateColumns(handle) {
   }
   if (courseFlagsAdded) {
     handle.prepare("UPDATE courses_services SET has_videos = 1, unlocks = 'none' WHERE slug = 'forex-premium-course'").run();
-    handle.prepare("UPDATE courses_services SET has_videos = 0, unlocks = 'live-room' WHERE slug = 'premium-live-trade-support'").run();
+    handle.prepare("UPDATE courses_services SET has_videos = 0, unlocks = 'live-room' WHERE slug = 'private-live-trade'").run();
     handle.prepare("UPDATE courses_services SET has_videos = 0, unlocks = 'consultation' WHERE slug = 'trading-consultation'").run();
     handle.prepare("UPDATE courses_services SET badge = '★ BESTSELLER' WHERE slug = 'forex-premium-course' AND (badge IS NULL OR badge = '')").run();
     // Original course card images (the design's photos) — set only
     // when empty, so an admin-chosen image is never overwritten.
     handle.prepare("UPDATE courses_services SET image = '/images/mentor-desk.webp' WHERE slug = 'forex-premium-course' AND (image IS NULL OR image = '')").run();
-    handle.prepare("UPDATE courses_services SET image = '/images/mentor-studio.webp' WHERE slug = 'premium-live-trade-support' AND (image IS NULL OR image = '')").run();
+    handle.prepare("UPDATE courses_services SET image = '/images/mentor-studio.webp' WHERE slug = 'private-live-trade' AND (image IS NULL OR image = '')").run();
     handle.prepare("UPDATE courses_services SET image = '/images/consultation-call.webp' WHERE slug = 'trading-consultation' AND (image IS NULL OR image = '')").run();
   }
 }
