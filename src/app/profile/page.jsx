@@ -48,14 +48,14 @@ export default async function ProfilePage({ searchParams }) {
 
   const enrollments = getEnrollments(user.id);
   const myPosts = getMyPosts(user.id);
-  // The composer shows for EVERY signed-in user on the profile (Siam's
-  // order — "profile er vitoreo thakbe", no exception for free users).
-  // The paid gate is enforced INSIDE the modal at post time, not by
-  // hiding the composer: a Consultation-only user sees the bar, taps
-  // it, and the modal shows the paid-member lock instead of the
-  // compose form. Posting is refused server-side too (see
-  // /api/community/posts — canEnterCommunity). The /community page
-  // itself stays fully locked for non-paid users.
+  // The composer on the profile follows the PAID-ONLY Community rule
+  // (Nov 2026, Siam's order): it shows ONLY for a user with an active
+  // paid enrollment. A Consultation-only / expired / no-enrollment user
+  // sees NO composer and NO Community link on /profile at all. The
+  // paid gate inside the modal and the server-side post refusal stay
+  // in place as defence in depth (see /api/community/posts —
+  // canEnterCommunity). The /community page itself stays fully locked
+  // for non-paid users.
   const canPost = canEnterCommunity(user.id);
   const communityAccess = getCommunityAccessState(user.id);
 
@@ -201,20 +201,36 @@ export default async function ProfilePage({ searchParams }) {
 
       {/* The same Facebook composer as the Community feed (Nov 2026):
           posting from here returns to /profile with the new post at
-          the top of your own posts. It shows for EVERY signed-in user
-          — the paid gate lives inside the modal (and server-side), not
-          by hiding the composer. */}
-      <FbComposer
-        me={{ id: user.id, name: user.name, profile_pic: user.profile_pic }}
-        returnTo="/profile"
-        canPost={canPost}
-        accessState={communityAccess}
-      />
+          the top of your own posts. PAID-ONLY: it renders only when
+          the user holds an active paid enrollment (canPost) — a
+          Consultation-only / expired / no-enrollment user sees no
+          composer on /profile at all. */}
+      {canPost ? (
+        <FbComposer
+          me={{ id: user.id, name: user.name, profile_pic: user.profile_pic }}
+          returnTo="/profile"
+          canPost={canPost}
+          accessState={communityAccess}
+        />
+      ) : null}
 
-      {/* My Posts / My Uploads — everything this user posted in the Community. */}
+      {/* My Posts / My Uploads — everything this user posted in the Community.
+          Non-paid users see plain text only — no Community link at all. */}
       <h2 style={{ marginTop: 32 }}>📤 My Posts / My Uploads</h2>
       {myPosts.length === 0 ? (
-        <div className="card"><p className="muted">You have not posted anything yet. <Link href="/community" className="amber">Write your first post in the Community →</Link></p></div>
+        <div className="card">
+          <p className="muted">
+            You have not posted anything yet.
+            {canPost ? (
+              <>
+                {" "}
+                <Link href="/community" className="amber">
+                  Write your first post in the Community →
+                </Link>
+              </>
+            ) : null}
+          </p>
+        </div>
       ) : null}
       {myPosts.map((p) => (
         <PostCard key={p.id} post={p} authorName={user.name} authorPic={user.profile_pic} authorId={user.id} />
