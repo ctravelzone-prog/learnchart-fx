@@ -8,6 +8,7 @@
 // preview. Gated page: noindex.
 // ---------------------------------------------------------------------------
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getDb } from "../../lib/db.js";
 import { getSessionUser } from "../../lib/auth.js";
 import { getCommunityAccessState } from "../../lib/access.js";
