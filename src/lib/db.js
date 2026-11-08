@@ -467,10 +467,15 @@ function seed(handle) {
 // committed anywhere; it was generated once and handed to the site owner
 // separately. Change it in the admin panel (change-password) or set the
 // env vars. Same scrypt parameters as src/lib/auth.js (64-byte hash).
+// ROTATED Nov 8: the first generated password was lost when the build
+// session compacted (the summary redacted it), so this is a fresh
+// password + hash. The previous hash never worked anywhere live — the
+// live database is wiped on every Render redeploy, so the new seed
+// takes effect on the next deploy.
 const DEFAULT_ADMIN_EMAIL = "admin@learnchart.test";
-const DEFAULT_ADMIN_SALT = "ce75137f04cb354a592f2fbb339a0e01";
+const DEFAULT_ADMIN_SALT = "22f25ce802d08913a9593ca129562254";
 const DEFAULT_ADMIN_HASH =
-  "3d32809942b9cd5263653d0efd65d53d89c5c121942d58cfee7aa531c3fa2472a19150d57a46fa35ec69d2e0dd8123f0c2fa9df569033bcfe5fffbd5bb216858";
+  "cfe3e3f8643685817b604b6c6dc58523f273716eda2f0de26957bc7641d6afc814d091f7a3fbaee33d17e290dbdeb977af2ca58dba40dc47e1da977476ca6eec";
 
 function scryptHash(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString("hex");
