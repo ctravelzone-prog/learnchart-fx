@@ -51,6 +51,20 @@ export default async function EnrollPage({ params, searchParams }) {
   if (hasEnrollment(user.id, slug)) redirect(`/enroll/${slug}/success`);
 
   const isPaid = course.price_cents > 0;
+  // What a paid buyer is promised once payment verifies. Video courses
+  // (has_videos) get a unique Course Key emailed — the key promise must
+  // ONLY appear for those, because completePaidEnrollment generates a key
+  // only when has_videos is true. A paid course without videos gets no
+  // key, so the promise names the area its `unlocks` flag opens instead.
+  // Same unlock names as the success page — keep the two in sync.
+  const unlockName =
+    course.unlocks === "live-room" ? "Live Room" :
+    course.unlocks === "consultation" ? "Trading Consultation area" : null;
+  const afterPayment = course.has_videos
+    ? `your enrollment completes and your Course Key is emailed to ${user.email}`
+    : unlockName
+      ? `your enrollment completes and the ${unlockName} opens for you`
+      : "your enrollment completes";
   // The USDT amount students must send: the admin-set amount wins when
   // present (Payment Settings), otherwise the course price ($250).
   const priceUsdt = getPayableAmountUsdt(course);
@@ -134,8 +148,8 @@ export default async function EnrollPage({ params, searchParams }) {
             <h3 style={{ marginTop: 8 }}>Pay with Binance — automatic, no manual check</h3>
             <p className="muted">
               Pay exactly <strong>{priceUsdt} USDT</strong> with either option below. The site verifies your
-              payment automatically — once it matches, your enrollment completes and your Course Key is emailed
-              to {user.email}. Nobody checks payments by hand, so keep your transaction ID safe.
+              payment automatically — once it matches, {afterPayment}. Nobody checks payments by hand, so keep
+              your transaction ID safe.
             </p>
 
             {/* Payment methods, rendered from the `methods` list above. */}
