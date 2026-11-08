@@ -13,12 +13,44 @@ export default async function AdminEnrollmentsPage({ searchParams }) {
   await requireAdmin();
   const sp = await searchParams;
   const filter = String(sp?.course || "");
+  const grant = String(sp?.grant || "");
+  const grantEmail = String(sp?.email || "");
   const courses = getAllCourses();
   const enrollments = listEnrollments(filter || null);
 
   return (
     <div className="wrap section">
       <h1 style={{ fontSize: 36 }}>Enrollments ({enrollments.length})</h1>
+      {/* Grant result — the grant route redirects back here with ?grant= */}
+      {grant === "ok" ? (
+        <div className="alert alert-ok">Enrollment granted{grantEmail ? ` to ${grantEmail}` : ""}.</div>
+      ) : grant === "already-enrolled" ? (
+        <div className="alert alert-error">That student already has an active enrollment for this course — nothing was changed.</div>
+      ) : grant === "no-user" ? (
+        <div className="alert alert-error">No user with that email — the student must register on the site first.</div>
+      ) : grant === "no-course" ? (
+        <div className="alert alert-error">Unknown course.</div>
+      ) : grant === "missing" ? (
+        <div className="alert alert-error">Enter an email and pick a course.</div>
+      ) : null}
+      {/* Grant enrollment — manual access without a payment (comp /
+          tester / demo account). The payment_status is stored as
+          "granted by admin" so it is never mistaken for a payment. */}
+      <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, margin: "0 0 4px" }}>Grant enrollment</h2>
+        <p className="small muted" style={{ margin: "0 0 12px" }}>
+          Give a registered student access without a payment. Monthly offers get 30 days from today.
+        </p>
+        <form method="post" action="/api/admin/enrollments/grant" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input type="email" name="email" required placeholder="student@example.com" style={{ flex: "1 1 220px" }} />
+          <select name="slug" required>
+            {courses.map((c) => (
+              <option key={c.slug} value={c.slug}>{c.title}</option>
+            ))}
+          </select>
+          <button type="submit" className="btn">Grant</button>
+        </form>
+      </div>
       <form method="get" style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <select name="course" defaultValue={filter}>
           <option value="">All offers</option>
