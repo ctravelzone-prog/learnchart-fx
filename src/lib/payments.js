@@ -30,6 +30,12 @@
 // = the double-spend guard) and then runs the SAME success path as a
 // free enrollment: enrollment row + unique Course Key + key email via
 // the existing mailer (src/lib/mail.js).
+//
+// FAILED payments are NOT lost: every failed verify (wrong amount /
+// wrong recipient / not found / Binance geo-block) is recorded in the
+// `payment_attempts` table (status 'pending') so the admin can see it
+// in Admin → Payments and follow up — money is never silently dropped.
+// A failure never auto-rejects the money; it queues it for review.
 // ---------------------------------------------------------------------------
 import crypto from "node:crypto";
 import { getDb, hasEnrollment, monthlyExpiresAt } from "./db.js";
@@ -105,6 +111,27 @@ function topicToAddress(topic) {
   return `0x${topic.slice(-40)}`.toLowerCase();
 }
 
+// Exact USDT → wei conversion WITHOUT float math. Floats cannot hold
+// 18-decimal values exactly (e.g. 12.779836415501434 USDT came back
+// 728 wei short via Math.round(x * 1e18) in a live test) — round course
+// amounts ($250 / $200) happened to survive, but any admin-set amount
+// with more decimals would never match. Parse the decimal string
+// instead: "250", "250.5", "12.779836415501434" all convert exactly.
+export function usdtToWei(amount) {
+  const s = String(amount).trim();
+  const [whole = "0", frac = ""] = s.split(".");
+  const fracPadded = (frac + "0".repeat(18)).slice(0, 18);
+  return BigInt(whole || "0") * 10n ** 18n + BigInt(fracPadded || "0");
+}
+
+// Wei → exact USDT decimal string ("12779836415501433560" → "12.779836415501434").
+export function weiToUsdtString(wei) {
+  const v = BigInt(wei);
+  const whole = v / 10n ** 18n;
+  const frac = (v % 10n ** 18n).toString().padStart(18, "0").replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : `${whole}`;
+}
+
 // --- RAIL 1: BEP20 receipt lookup ------------------------------------------
 // One receipt fetch, BscScan first (when a key is set), public BSC
 // JSON-RPC as the fallback so verification works with zero keys.
@@ -144,6 +171,9 @@ async function fetchReceipt(txHash, bscscanKey) {
 // Verify a BEP20 USDT payment. Returns { ok } or { ok:false, reason }.
 // Reasons: "bad-format" | "not-found" | "lookup-failed" | "failed" |
 // "no-usdt-transfer" | "wrong-recipient" | "wrong-amount".
+// On wrong-amount / wrong-recipient the result also carries `detail`
+// ({ from, to, amountUsdt }) so the failure can be queued for admin
+// review with the real on-chain values — the money is traceable.
 export async function verifyBep20Tx({ txHash, expectedAddress, expectedAmountUsdt }) {
   const hash = String(txHash || "").trim();
   if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
@@ -165,26 +195,30 @@ export async function verifyBep20Tx({ txHash, expectedAddress, expectedAmountUsd
   // The receipt's `to` is the USDT contract, NOT the recipient — the
   // real recipient + amount live in the Transfer event logs. Find a
   // USDT transfer in this transaction and check it against the order.
-  const expectedValue = BigInt(Math.round(expectedAmountUsdt * 1e18));
+  const expectedValue = usdtToWei(expectedAmountUsdt);
   const merchant = expectedAddress.toLowerCase();
   let sawUsdtTransfer = false;
   let sawRightRecipient = false;
+  let detail = null;
   for (const log of receipt.logs || []) {
     if (String(log.address || "").toLowerCase() !== USDT_BEP20_CONTRACT) continue;
     if (!log.topics || log.topics[0] !== TRANSFER_TOPIC) continue;
     sawUsdtTransfer = true;
     const to = topicToAddress(log.topics[2]);
     const value = BigInt(log.data || "0x0");
+    const from = topicToAddress(log.topics[1]);
+    if (!detail) detail = { from, to, amountUsdt: weiToUsdtString(value) };
     if (to === merchant) {
       sawRightRecipient = true;
+      detail = { from, to, amountUsdt: weiToUsdtString(value) };
       if (value === expectedValue) {
-        return { ok: true, from: topicToAddress(log.topics[1]), amountUsdt: expectedAmountUsdt };
+        return { ok: true, from, amountUsdt: expectedAmountUsdt };
       }
     }
   }
   if (!sawUsdtTransfer) return { ok: false, reason: "no-usdt-transfer" };
-  if (!sawRightRecipient) return { ok: false, reason: "wrong-recipient" };
-  return { ok: false, reason: "wrong-amount" };
+  if (!sawRightRecipient) return { ok: false, reason: "wrong-recipient", detail };
+  return { ok: false, reason: "wrong-amount", detail };
 }
 
 // --- RAIL 2a: Binance Pay TxID check (owner's read-only API key) -----------
@@ -220,6 +254,7 @@ async function fetchPayHistory({ apiKey, apiSecret, windowDays = 7 }) {
   const query = params.toString();
   const signature = crypto.createHmac("sha256", apiSecret).update(query).digest("hex");
   let lastError = null;
+  let blocked451 = 0;
   for (const host of BINANCE_API_HOSTS) {
     try {
       const res = await fetchWithTimeout(
@@ -228,6 +263,7 @@ async function fetchPayHistory({ apiKey, apiSecret, windowDays = 7 }) {
       );
       // 451 = geo-blocked in this region — try the next host.
       if (res.status === 451) {
+        blocked451 += 1;
         lastError = new Error(`binance pay history HTTP 451 from ${host}`);
         continue;
       }
@@ -243,6 +279,14 @@ async function fetchPayHistory({ apiKey, apiSecret, windowDays = 7 }) {
       lastError = err;
     }
   }
+  // Every host answered 451: this is a geo-block, not a transient
+  // error — retrying in a minute will not help. Callers surface this
+  // honestly (and point the student at BEP20) instead of "try again".
+  if (blocked451 === BINANCE_API_HOSTS.length) {
+    const err = new Error("binance pay history geo-blocked (HTTP 451 from all hosts)");
+    err.code = "GEO_BLOCKED";
+    throw err;
+  }
   throw lastError || new Error("binance pay history unreachable");
 }
 
@@ -252,7 +296,10 @@ async function fetchPayHistory({ apiKey, apiSecret, windowDays = 7 }) {
 // the recent window. Direction is checked best-effort: when the record
 // carries receiver info and the configured Pay ID is in none of it,
 // the record is treated as outgoing and skipped.
-// Reasons: "bad-format" | "not-configured" | "api-error" | "not-found".
+// Reasons: "bad-format" | "not-configured" | "api-error" | "geo-blocked" | "not-found".
+// "geo-blocked" means Binance answered HTTP 451 from every host — the
+// US server cannot check Binance Pay at all right now; the student
+// must use BEP20 instead (it verifies on-chain, no Binance API).
 export async function verifyBinancePayTx({ orderId, expectedAmountUsdt }) {
   const id = String(orderId || "").trim();
   if (!id) return { ok: false, reason: "bad-format" };
@@ -264,6 +311,7 @@ export async function verifyBinancePayTx({ orderId, expectedAmountUsdt }) {
     history = await fetchPayHistory(cfg);
   } catch (err) {
     console.error("[payments] binance pay history failed:", err?.message || err);
+    if (err?.code === "GEO_BLOCKED") return { ok: false, reason: "geo-blocked" };
     return { ok: false, reason: "api-error" };
   }
 
@@ -287,6 +335,29 @@ export async function verifyBinancePayTx({ orderId, expectedAmountUsdt }) {
   return { ok: false, reason: "not-found" };
 }
 
+// --- Failed-payment queue (pending / review, never silently lost) -----
+// A failed verify is recorded here by the verify routes: the student,
+// course, method, reference, reason, expected amount and the real
+// on-chain detail (from / to / amount when known). Status stays
+// 'pending' until an admin reviews it in Admin → Payments. One row per
+// (tx_ref, method, reason) — a student retrying the same hash does not
+// spam the queue. Successful payments never land here (they go to the
+// `payments` table instead).
+export function recordPaymentAttempt({ userId, courseSlug, method, txRef, reason, expectedAmount, detail }) {
+  const db = getDb();
+  try {
+    db.prepare(
+      "INSERT OR IGNORE INTO payment_attempts (user_id, course_slug, method, tx_ref, reason, expected_amount, detail, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')"
+    ).run(
+      userId, courseSlug, method, String(txRef || "").trim(), reason,
+      expectedAmount === undefined || expectedAmount === null ? "" : String(expectedAmount),
+      detail ? JSON.stringify(detail) : ""
+    );
+  } catch (err) {
+    console.error("[payments] recordPaymentAttempt failed:", err?.message || err);
+  }
+}
+
 // --- Shared success path ---------------------------------------------------
 // Record the payment, create the enrollment, generate the Course Key and
 // email it — exactly like the free-enroll path in /api/enroll, so a paid
@@ -298,14 +369,11 @@ export async function completePaidEnrollment({ userId, course, method, txRef, am
   const db = getDb();
   const slug = course.slug;
 
-  // Already enrolled (e.g. double-click / retry)? Do not create a
-  // second enrollment or a second key — the first payment stands.
-  if (hasEnrollment(userId, slug)) {
-    return { ok: true, keymail: "already-enrolled" };
-  }
-
-  // Record the payment FIRST: the UNIQUE tx_hash stops any replay of
-  // the same transaction, even under a race.
+  // Record the payment FIRST — before the already-enrolled check.
+  // Otherwise a second payment from an already-enrolled student would
+  // never be recorded, and its TxHash would stay reusable by anyone
+  // else (replay hole). The UNIQUE tx_hash stops any replay of the
+  // same transaction, even under a race.
   try {
     db.prepare(
       "INSERT INTO payments (user_id, course_slug, method, tx_hash, amount, currency, status) VALUES (?, ?, ?, ?, ?, ?, 'verified')"
@@ -315,6 +383,13 @@ export async function completePaidEnrollment({ userId, course, method, txRef, am
       return { ok: false, reason: "duplicate" };
     }
     throw err;
+  }
+
+  // Already enrolled (e.g. double-click / retry)? Do not create a
+  // second enrollment or a second key — the first payment stands.
+  // (The payment above IS recorded, so this TxHash cannot be replayed.)
+  if (hasEnrollment(userId, slug)) {
+    return { ok: true, keymail: "already-enrolled" };
   }
 
   const paymentStatus = `paid — ${method} ${amount} ${currency}`;

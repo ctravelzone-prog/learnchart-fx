@@ -14,6 +14,7 @@ import { getSessionUser } from "../../../../lib/auth.js";
 import {
   verifyBinancePayTx,
   completePaidEnrollment,
+  recordPaymentAttempt,
   isTxRefUsed,
   isBinancePayTxConfigured,
   getPayableAmountUsdt,
@@ -26,6 +27,8 @@ const ERRORS = {
     "We cannot find a Binance Pay payment with this Order ID for exactly the course price in the last 7 days — check the Order ID in your Binance app and try again.",
   "api-error":
     "We could not check with Binance just now — please try again in a minute.",
+  "geo-blocked":
+    "Binance Pay check is blocked from our server right now (Binance returns HTTP 451 from US servers) — please pay with BEP20 USDT instead, it verifies instantly on-chain.",
   duplicate:
     "This payment was already used for an enrollment — each payment can only enroll once.",
   "not-configured":
@@ -51,7 +54,17 @@ export async function POST(request) {
 
   const expectedAmount = getPayableAmountUsdt(course);
   const result = await verifyBinancePayTx({ orderId, expectedAmountUsdt: expectedAmount });
-  if (!result.ok) return back(result.reason);
+  if (!result.ok) {
+    // Geo-block / not-found: queue for admin review so the payment is
+    // traceable. A mistyped ID (bad-format) is not queued.
+    if (["not-found", "geo-blocked"].includes(result.reason)) {
+      recordPaymentAttempt({
+        userId: user.id, courseSlug: slug, method: "binance-pay", txRef: orderId,
+        reason: result.reason, expectedAmount, detail: null,
+      });
+    }
+    return back(result.reason);
+  }
 
   const done = await completePaidEnrollment({
     userId: user.id,

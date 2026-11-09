@@ -14,6 +14,7 @@ import { getSessionUser } from "../../../../lib/auth.js";
 import {
   verifyBep20Tx,
   completePaidEnrollment,
+  recordPaymentAttempt,
   isTxRefUsed,
   isBep20Configured,
   getBep20Config,
@@ -72,7 +73,19 @@ export async function POST(request) {
     expectedAddress: getBep20Config().address,
     expectedAmountUsdt: expectedAmount,
   });
-  if (!result.ok) return back(result.reason);
+  if (!result.ok) {
+    // Failed payment? Never silently dropped: queue it for admin
+    // review (wrong amount / wrong recipient / not found). A mistyped
+    // hash (bad-format) or a transient chain outage (lookup-failed)
+    // is not money sent, so those are not queued.
+    if (["not-found", "failed", "no-usdt-transfer", "wrong-recipient", "wrong-amount"].includes(result.reason)) {
+      recordPaymentAttempt({
+        userId: user.id, courseSlug: slug, method: "bep20-usdt", txRef: txHash,
+        reason: result.reason, expectedAmount, detail: result.detail || null,
+      });
+    }
+    return back(result.reason);
+  }
 
   // Same transaction could have been verified twice in parallel — the
   // UNIQUE tx_hash in completePaidEnrollment is the final guard.

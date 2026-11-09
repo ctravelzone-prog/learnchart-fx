@@ -343,6 +343,26 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Failed payment attempts (Nov 2026 deposit auto-check fix). A verify
+-- that fails (wrong amount / wrong recipient / not found / Binance
+-- geo-block) lands here as 'pending' so the admin can review it —
+-- the money is never silently dropped. UNIQUE(tx_ref, method, reason)
+-- so retrying the same hash does not spam the queue. Successful
+-- payments never land here; they go to the payments table above.
+CREATE TABLE IF NOT EXISTS payment_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_slug TEXT NOT NULL,
+  method TEXT NOT NULL,
+  tx_ref TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  expected_amount TEXT NOT NULL DEFAULT '',
+  detail TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  reviewed_at TEXT,
+  UNIQUE(tx_ref, method, reason)
+);
 -- Binance Pay merchant orders (created via the Create Order API v3).
 -- The webhook looks an order up by merchant_trade_no when Binance
 -- reports PAY_SUCCESS, so the enrollment can be completed then.
@@ -1062,6 +1082,25 @@ export function getPayment(id) {
     )
     .get(id);
   return row || null;
+}
+
+// Failed payment attempts (pending review queue) — newest first, with
+// the student's name/email joined in. Only 'pending' rows are shown
+// on the admin Payments page; reviewed ones stay in the table.
+export function listPaymentAttempts() {
+  return getDb()
+    .prepare(
+      `SELECT a.*, u.name AS user_name, u.email AS user_email
+       FROM payment_attempts a JOIN users u ON u.id = a.user_id
+       WHERE a.status = 'pending' ORDER BY a.created_at DESC`
+    )
+    .all();
+}
+
+export function resolvePaymentAttempt(id) {
+  getDb()
+    .prepare("UPDATE payment_attempts SET status = 'reviewed', reviewed_at = datetime('now') WHERE id = ?")
+    .run(id);
 }
 
 export function listPostsAdmin() {
