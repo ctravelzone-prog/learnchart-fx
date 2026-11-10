@@ -762,6 +762,75 @@ function seedAdminDefaults(handle) {
   }
 }
 
+// --- Seed the demo accounts (idempotent, demo-only) -----------------------
+// WHY: Render's free tier wipes the SQLite file on every redeploy /
+// restart, so the demo accounts Siam logs in with kept vanishing —
+// "login vul" 3 times in 2 days (Nov 9–10). The admin account already
+// re-seeds itself the same way; the demo accounts now do too, so after
+// ANY wipe the site boots with siam@learnchart.test / LearnChart123 and
+// gate@learnchart.test / GateTest123 working, with siam's Consultation +
+// Private Live Trade enrollments restored.
+// SAFETY: only these two demo emails, never a real student — rows are
+// inserted only when missing, so a live DB is never overwritten. A demo
+// enrollment that LAPSED (monthly PLT past its 30 days) is renewed on
+// boot so the preview account never locks; a demo enrollment the admin
+// CANCELLED (status != 'active') is left alone. Delete a demo user in
+// Admin → Users to remove it — it comes back on the next restart by
+// design (that is the point).
+// Passwords are hashed with scrypt + a fresh random salt at first seed,
+// exactly like the admin seed; the plain passwords are the ones already
+// handed to the site owner and are never written in this file.
+const DEMO_ACCOUNTS = [
+  { name: "Siam Test", email: "siam@learnchart.test", password: "LearnChart123" },
+  { name: "Gate Test", email: "gate@learnchart.test", password: "GateTest123" },
+];
+
+function seedDemoAccounts(handle) {
+  const insertUser = handle.prepare(
+    "INSERT OR IGNORE INTO users (name, email, password_hash, password_salt) VALUES (?, ?, ?, ?)"
+  );
+  for (const demo of DEMO_ACCOUNTS) {
+    const salt = crypto.randomBytes(16).toString("hex");
+    insertUser.run(demo.name, demo.email, scryptHash(demo.password, salt), salt);
+  }
+
+  // siam's demo enrollments: free Consultation (never expires) + Private
+  // Live Trade (monthly, 30 days). gate stays unenrolled on purpose —
+  // it is the locked-preview test account.
+  const siam = handle.prepare("SELECT id FROM users WHERE email = ?").get("siam@learnchart.test");
+  if (!siam) return;
+  const courseId = (slug) =>
+    handle.prepare("SELECT id FROM courses_services WHERE slug = ?").get(slug)?.id;
+  const consultId = courseId("trading-consultation");
+  const pltId = courseId("private-live-trade");
+  if (!consultId || !pltId) return;
+
+  const existing = handle.prepare(
+    "SELECT id, status, expires_at FROM enrollments WHERE user_id = ? AND course_id = ?"
+  );
+  const insertEnrollment = handle.prepare(
+    "INSERT INTO enrollments (user_id, course_id, status, payment_status, expires_at) VALUES (?, ?, 'active', 'granted by admin', ?)"
+  );
+
+  // Consultation: insert once, never touch again.
+  if (!existing.get(siam.id, consultId)) {
+    insertEnrollment.run(siam.id, consultId, null);
+  }
+
+  // Private Live Trade: insert once; if the row exists but the 30 days
+  // ran out, renew it so the demo account never locks on expiry.
+  const plt = existing.get(siam.id, pltId);
+  if (!plt) {
+    insertEnrollment.run(siam.id, pltId, monthlyExpiresAt());
+  } else if (
+    plt.status === "active" &&
+    plt.expires_at &&
+    plt.expires_at <= new Date().toISOString().slice(0, 19).replace("T", " ")
+  ) {
+    handle.prepare("UPDATE enrollments SET expires_at = ? WHERE id = ?").run(monthlyExpiresAt(), plt.id);
+  }
+}
+
 // --- Init (schema + seed) with a lock retry ---------------------------
 // Next.js evaluates many route/page modules in parallel during `next
 // build`, so several connections can try to create the schema at the
@@ -777,6 +846,7 @@ function initDatabase(handle) {
       migrateColumns(handle);
       seed(handle);
       seedAdminDefaults(handle);
+      seedDemoAccounts(handle);
       return;
     } catch (err) {
       const busy = err && (err.errcode === 5 || /locked|busy/i.test(err.message || ""));
